@@ -14,14 +14,15 @@
 
 package queery
 
-const (
-
-	googleProject = "boos-demo-projects-are-rad"
-
-
-)
-
 // Options holds all the possible options we might be interested in using for our Big Data query
 type Options struct {
 
+	// GoogleProject is the Google project to use
+	GoogleProject string
+
+	// CellLimit is the limit to how many cells we should pull out of big query
+	CellLimit int
+
+	// PathToAuthFile is the path on the local filesystem to find a google authentication file
+	PathToAuthFile string
 }

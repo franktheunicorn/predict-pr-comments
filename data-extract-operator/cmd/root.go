@@ -16,32 +16,56 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+
+	lol "github.com/kris-nova/lolgopher"
+
 	"github.com/holdenk/predict-pr-comments/data-extract-operator/queery"
 	"github.com/kris-nova/logger"
-	"os"
+	"github.com/kubicorn/kubicorn/pkg/local"
 
 	"github.com/spf13/cobra"
 )
 
-var queeropts = &queery.Options{}
+const (
+	outputFileMode = 0644
+)
+
+var (
+	queeropts  = &queery.Options{}
+	outputFile = ""
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "data-extract-operator",
 	Short: "Run the data extractor for the PR prediction data",
-	Long: `This scrapes Big Query for the necessary data to build the machine learning project.`,
+	Long:  `Use this command to start the operator in the default mode of running a single query as a procedural program.`,
 
+	// Run is the main entry point of the program
 	Run: func(cmd *cobra.Command, args []string) {
+
 		ds, err := queery.PullDataSet(queeropts)
 		if err != nil {
-			logger.Critical("Fatal error: %v", err)
+			logger.Critical("Fatal error during query: %v", err)
+			os.Exit(1)
 		}
-		// TODO (@kris-nova) logic to handle the dataset and write it wherever Holden needs it
-		ds.ToCSV()
+		csvBuffer, err := ds.ToCSV()
+		if err != nil {
+			logger.Critical("Fatal error during CSV generation: %v", err)
+			os.Exit(2)
+		}
+		err = ioutil.WriteFile(outputFile, csvBuffer.Bytes(), outputFileMode)
+		if err != nil {
+			logger.Critical("Unable to write file: %v", err)
+			logger.Critical("Dumping file:")
+			fmt.Println(csvBuffer.String())
+			os.Exit(3)
+		}
+		logger.Always("Wrote CSV to file: %s", outputFile)
 	},
 }
-
-
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -53,7 +77,12 @@ func Execute() {
 }
 
 func init() {
- 	// commands
+	logger.FabulousTrueWriter = lol.NewTruecolorLolWriter()
+	rootCmd.PersistentFlags().BoolVarP(&logger.Fabulous, "fabulous", "f", false, "Toggle rainbow logs")
+	rootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
+	rootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
+	rootCmd.PersistentFlags().IntVarP(&queeropts.CellLimit, "cell-limit", "l", 100, "The number of cells per set to pull")
+	rootCmd.PersistentFlags().StringVarP(&queeropts.GoogleProject, "google-project", "p", "", "The name of the Google project to use")
+	rootCmd.PersistentFlags().StringVarP(&queeropts.PathToAuthFile, "auth-file", "a", fmt.Sprintf("%s/.google/auth.json", local.Home()), "The path to the Google auth file to use")
+	rootCmd.Flags().StringVarP(&outputFile, "output-file", "o", fmt.Sprintf("%s/predict-github-comments.csv", local.Home()), "The path to the Google auth file to use")
 }
-
-
