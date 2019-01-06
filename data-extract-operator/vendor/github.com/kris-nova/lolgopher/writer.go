@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	isatty "github.com/mattn/go-isatty"
+	"github.com/mattn/go-isatty"
 )
 
 const (

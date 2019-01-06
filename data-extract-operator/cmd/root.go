@@ -85,4 +85,5 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&queeropts.GoogleProject, "google-project", "p", "", "The name of the Google project to use")
 	rootCmd.PersistentFlags().StringVarP(&queeropts.PathToAuthFile, "auth-file", "a", fmt.Sprintf("%s/.google/auth.json", local.Home()), "The path to the Google auth file to use")
 	rootCmd.Flags().StringVarP(&outputFile, "output-file", "o", fmt.Sprintf("%s/predict-github-comments.csv", local.Home()), "The path to the Google auth file to use")
+	rootCmd.AddCommand(cloudCmd)
 }

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	colorable "github.com/mattn/go-colorable"
-	isatty "github.com/mattn/go-isatty"
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 )
 
 var (
