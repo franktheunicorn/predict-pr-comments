@@ -1,3 +1,17 @@
+// Copyright © 2018 Kris Nova <kris@nivenly.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cloudstorage
 
 import (
@@ -68,7 +82,6 @@ func (gc *GoogleCloudHandler) MutableSyncBytes(buffer bytes.Buffer, objectname s
 
 	// attrs is hand for outputting meta information about the newly synced object
 	validated := false
-	var attrs *storage.ObjectAttrs
 	for i := options.SyncWaitSecondAttempts; i >= 0; i-- {
 		_, err := objectHandler.Attrs(context.TODO())
 		if err != nil {
@@ -82,7 +95,7 @@ func (gc *GoogleCloudHandler) MutableSyncBytes(buffer bytes.Buffer, objectname s
 	}
 	if validated {
 		// Atomicity is safe here
-		_, err := objectHandler.Update(context.TODO(), storage.ObjectAttrsToUpdate{
+		attrs, err := objectHandler.Update(context.TODO(), storage.ObjectAttrsToUpdate{
 			Metadata: map[string]string{
 				"Timestamp RFC3339": rfc3339time,
 				"Public":            "True",

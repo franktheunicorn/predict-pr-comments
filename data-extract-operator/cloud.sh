@@ -16,6 +16,7 @@ set -e
 go install .
 data-extract-operator cloud \
     --google-project boos-demo-projects-are-rad \
-    --cell-limit 20000 \
+    --cell-limit -1 \
+    --date 2015 \
     --auth-file ~/.nova_credentials.json \
     --bucket tigeys-buckets-are-rad
