@@ -35,6 +35,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/kris-nova/lolgopher"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/kubicorn/kubicorn"
 
 [[constraint]]
@@ -42,8 +46,12 @@
   version = "0.0.3"
 
 [[constraint]]
-  branch = "master"
   name = "google.golang.org/api"
+  version = "0.1.0"
+
+[[constraint]]
+  name = "k8s.io/kubernetes"
+  version = "1.13.1"
 
 [prune]
   go-tests = true

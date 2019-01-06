@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	cloudqueer = &queery.Options{}
-	cloud      = ""
+	csoptions = &cloudstorage.Options{}
+	cloud     = ""
 )
 
 var cloudCmd = &cobra.Command{
@@ -38,6 +38,11 @@ var cloudCmd = &cobra.Command{
 
 	// Run is the main entry point of the program
 	Run: func(cmd *cobra.Command, args []string) {
+
+		// Todo @kris-nova we have option bloat as per usual please do a consolidate
+		csoptions.PathToAuthFile = queeropts.PathToAuthFile
+		csoptions.GoogleProject = queeropts.GoogleProject
+
 		err := validate()
 		if err != nil {
 			logger.Critical("Failed validation: %v", err)
@@ -52,7 +57,7 @@ var cloudCmd = &cobra.Command{
 
 		switch cloud {
 		case "gcs":
-			err := cloudstorage.GCSSync(ds)
+			err := cloudstorage.GCSSync(csoptions, ds)
 			if err != nil {
 				logger.Critical("Unable to sync to cloud: %v", err)
 				os.Exit(98)
@@ -65,8 +70,9 @@ var cloudCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&cloud, "cloud", "c", "gcs", "The cloud storage account to use. Currently supported [GCS Google Cloud Storage]")
-	rootCmd.Flags().StringVarP(&cloud, "cloud", "c", "gcs", "The cloud storage account to use. Currently supported [GCS Google Cloud Storage]")
+	cloudCmd.Flags().StringVarP(&cloud, "cloud", "c", "gcs", "The cloud storage account to use. Currently supported [GCS Google Cloud Storage]")
+	cloudCmd.Flags().StringVarP(&csoptions.Bucket, "bucket", "b", "tigeys-buckets-are-rad", "The cloud storage account to use. Currently supported [GCS Google Cloud Storage]")
+	cloudCmd.Flags().IntVarP(&csoptions.SyncWaitSecondAttempts, "sync-second-attempts", "N", 30, "When writing a new object to the cloud, we validate it's create. This defines how many single second attempts to wait for the eventually consistent API.")
 }
 
 func validate() error {

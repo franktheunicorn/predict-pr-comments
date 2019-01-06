@@ -20,8 +20,11 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
+
+	sha2562 "crypto/sha256"
+
+	"reflect"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/kris-nova/logger"
@@ -78,7 +81,10 @@ var (
 
 //DataSet is an in memory structure of data we can use for various tasks in our package
 type DataSet struct {
-	Cells []Cell
+	Cells     []Cell
+	RawQuery  string
+	RawCSV    bytes.Buffer
+	CSVSha256 string
 }
 
 // PullDataSet is a deterministic operation that will pull a DataSet from Big Query given set of options.
@@ -91,11 +97,13 @@ func PullDataSet(opt *Options) (*DataSet, error) {
 		return nil, err
 	}
 
-	// Initalize a new DataSet
-	set := DataSet{}
-
 	// Interpolate the query
 	interpolatedQuery := fmt.Sprintf(RawQuery, opt.CellLimit)
+
+	// Initalize a new DataSet
+	set := DataSet{
+		RawQuery: interpolatedQuery,
+	}
 
 	// Execute the query
 	logger.Always("Loading interpolated query")
@@ -136,11 +144,12 @@ func PullDataSet(opt *Options) (*DataSet, error) {
 			logger.Warning("%+v\n", rawCell)
 			continue
 		}
-		logger.Success("Parsing Pull Request URL: %s", cell.PullRequestURL)
+		//logger.Always("%+v\n", cell)
+		//logger.Success("Parsing Pull Request URL: %s", cell.PullRequestURL)
 		//logger.Success("%+v\n", cell)
 		set.Cells = append(set.Cells, cell)
 	}
-
+	logger.Always("Data set created in memory")
 	return &set, nil
 }
 
@@ -158,7 +167,7 @@ func (d *DataSet) PostProcessFields() {
 }
 
 // ToCSV will convert a DataSet into an RFC-4180 CSV.
-// Furthermore this function is a memory bitch and will stick the entire CSV into memory and output the whole thing
+// Furthermore this function is a memory hog and will stick the entire CSV into memory and output the whole thing
 // as a buffer. If we start processing large CSVs then we should probably take advantage of the Go standard library
 // io.Writer capability and not use a buffer.
 func (d *DataSet) ToCSV() (bytes.Buffer, error) {
@@ -175,18 +184,36 @@ func (d *DataSet) ToCSV() (bytes.Buffer, error) {
 			tag := val.Type().Field(i).Tag.Get("json")
 			for j, headerName := range CSVHeader[0] {
 				if headerName == tag {
+					//fmt.Printf("Header Name (%s)\n Tag Name (%s)\n", headerName, tag)
+					//fmt.Printf("Field Value (%s)\n\n", val.Field(i).String())
 					row[j] = val.Field(i).String()
 				}
 			}
 		}
-		// translate to a slice
 		var strs []string
-		for _, str := range row {
-			strs = append(strs, str)
+		// So basically go randomizes hashmaps to prevent people from doing exactly what I just did
+		// which I guess is good, but also really annoying right now
+		// Anyway I wrote a dynamic for loop to help rebuild our list of strings, this time in consistent order.
+		//
+		// ----------------------------
+		// Don't ever do this
+		// for i, str := range row {
+		//   strs = append(strs, str)
+		// }
+		// ----------------------------
+		rLen := len(row)
+		for n := 0; n < rLen; n++ {
+			strs = append(strs, row[n])
 		}
 		records = append(records, strs)
 	}
 	writer.WriteAll(records)
 	logger.Success("Successfully built CSV in memory")
+	d.RawCSV = buffer
+
+	// Grab a hash of the file for naming later
+	sha256 := fmt.Sprintf("%x", sha2562.Sum256(buffer.Bytes()))
+	d.CSVSha256 = sha256
+	logger.Info("CSV File SHA256 [%s]", sha256)
 	return buffer, nil
 }
