@@ -57,10 +57,26 @@ var cloudCmd = &cobra.Command{
 
 		switch cloud {
 		case "gcs":
-			err := cloudstorage.GCSSync(csoptions, ds)
+			handler, err := cloudstorage.NewGoogleCloudHandler(csoptions)
 			if err != nil {
-				logger.Critical("Unable to sync to cloud: %v", err)
+				logger.Critical("Unable to create handler to cloud: %v", err)
 				os.Exit(98)
+			}
+			err = handler.EnsureBucket()
+			if err != nil {
+				logger.Critical("Unable to ensure bucket: %v", err)
+				os.Exit(97)
+			}
+			buffer, err := ds.ToCSV()
+			if err != nil {
+				logger.Critical("Unable to generate CSV: %v", err)
+				os.Exit(96)
+			}
+			// Note we do not check for existing here as this is the procederual script
+			err = handler.MutableSyncBytes(buffer, fmt.Sprintf("%s.csv", ds.DateString))
+			if err != nil {
+				logger.Critical("Unable to sync bytes: %v", err)
+				os.Exit(95)
 			}
 		default:
 			logger.Critical("Historical error: invalid cloud: %s", cloud)

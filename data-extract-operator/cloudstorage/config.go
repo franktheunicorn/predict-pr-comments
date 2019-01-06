@@ -14,6 +14,8 @@
 
 package cloudstorage
 
+import "cloud.google.com/go/storage"
+
 // Options holds all the possible options we might be interested in using for our sync to cloud storage
 type Options struct {
 
@@ -29,4 +31,9 @@ type Options struct {
 	// SyncWaitSecondAttempts is the amount of attempts to attempt to validate a newly created object has been
 	// created via the API. One attempt per second.
 	SyncWaitSecondAttempts int
+}
+
+type GoogleCloudHandler struct {
+	Options *Options
+	Client  *storage.Client
 }

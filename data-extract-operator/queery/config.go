@@ -25,4 +25,7 @@ type Options struct {
 
 	// PathToAuthFile is the path on the local filesystem to find a google authentication file
 	PathToAuthFile string
+
+	// DateString is an optional datestring to use in the query. Examples: 2018 20190101 yesterday
+	DateString string
 }

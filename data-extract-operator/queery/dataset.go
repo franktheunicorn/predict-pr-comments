@@ -26,6 +26,8 @@ import (
 
 	"reflect"
 
+	"time"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/kris-nova/logger"
 	"google.golang.org/api/iterator"
@@ -36,18 +38,18 @@ const (
 
 	// Query is our main query we can manipulate as needed. This is interpolated later so expect a few erroneous %'s
 	// Thanks to Holden Karau for writing the query <3
-	RawQuery = `SELECT pull_request_url, 
-ANY_VALUE(pull_patch_url) as pull_patch_url, 
-ARRAY_AGG(comment_position IGNORE NULLS) as comments_positions, 
-ARRAY_AGG(comment_original_position IGNORE NULLS) as comments_original_positions  
-FROM (SELECT *, JSON_EXTRACT(payload, '$.action') 
-AS action, JSON_EXTRACT(payload, '$.pull_request.url') 
-AS pull_request_url, JSON_EXTRACT(payload, '$.pull_request.patch_url') AS pull_patch_url, 
-JSON_EXTRACT(payload, '$.comment.original_position') AS comment_original_position, 
-JSON_EXTRACT(payload, '$.comment.position') AS comment_position 
-FROM ` + "`githubarchive.day.2018*`" + `WHERE type = "PullRequestReviewCommentEvent"
+	RawQuery = `SELECT pull_request_url,
+ANY_VALUE(pull_patch_url) as pull_patch_url,
+ARRAY_AGG(comment_position IGNORE NULLS) as comments_positions,
+ARRAY_AGG(comment_original_position IGNORE NULLS) as comments_original_positions
+FROM (SELECT *, JSON_EXTRACT(payload, '$.action')
+AS action, JSON_EXTRACT(payload, '$.pull_request.url')
+AS pull_request_url, JSON_EXTRACT(payload, '$.pull_request.patch_url') AS pull_patch_url,
+JSON_EXTRACT(payload, '$.comment.original_position') AS comment_original_position,
+JSON_EXTRACT(payload, '$.comment.position') AS comment_position
+FROM ` + "`githubarchive.day.%s*`" + `WHERE type = "PullRequestReviewCommentEvent"
 OR type = "PullRequestEvent2") GROUP BY pull_request_url
-LIMIT %d`
+%s`
 )
 
 // A representation of the each cell of data back from the above query
@@ -81,10 +83,11 @@ var (
 
 //DataSet is an in memory structure of data we can use for various tasks in our package
 type DataSet struct {
-	Cells     []Cell
-	RawQuery  string
-	RawCSV    bytes.Buffer
-	CSVSha256 string
+	Cells      []Cell
+	RawQuery   string
+	RawCSV     bytes.Buffer
+	CSVSha256  string
+	DateString string
 }
 
 // PullDataSet is a deterministic operation that will pull a DataSet from Big Query given set of options.
@@ -98,11 +101,27 @@ func PullDataSet(opt *Options) (*DataSet, error) {
 	}
 
 	// Interpolate the query
-	interpolatedQuery := fmt.Sprintf(RawQuery, opt.CellLimit)
+	// 1 string data such as (2018) or (20190106)
+	// 2 string limit clause if applicable
+	var interpolatedQuery string
+	if opt.DateString == "yesterday" {
+		yesterday := strings.Replace(
+			strings.Split(
+				time.Now().AddDate(
+					0, 0, -1).Format(
+					"2006-01-02 15:04:05"), " ")[0], "-", "", -1)
+		opt.DateString = yesterday
+	}
+	if opt.CellLimit == -1 {
+		interpolatedQuery = fmt.Sprintf(RawQuery, opt.DateString, "")
+	} else {
+		interpolatedQuery = fmt.Sprintf(RawQuery, opt.DateString, fmt.Sprintf("LIMIT %d", opt.CellLimit))
+	}
 
 	// Initalize a new DataSet
 	set := DataSet{
-		RawQuery: interpolatedQuery,
+		RawQuery:   interpolatedQuery,
+		DateString: opt.DateString,
 	}
 
 	// Execute the query
