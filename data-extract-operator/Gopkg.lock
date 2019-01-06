@@ -2,17 +2,19 @@
 
 
 [[projects]]
-  digest = "1:c3634b8a49c95783249929c55058fbeffc354c8dcc864ce873c495226ea9d905"
+  digest = "1:d105a05d8afab65efe652f3cedaca21bee088fb6bcdc0f62ffd5df7e2bf041d5"
   name = "cloud.google.com/go"
   packages = [
     "bigquery",
     "civil",
     "compute/metadata",
+    "iam",
     "internal",
     "internal/fields",
     "internal/optional",
     "internal/trace",
     "internal/version",
+    "storage",
   ]
   pruneopts = "UT"
   revision = "0ebda48a7f143b1cce9eb37a8c1106ac762a3430"
@@ -27,10 +29,11 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
+  digest = "1:5d1b5a25486fc7d4e133646d834f6fca7ba1cef9903d40e7aa786c41b89e9e91"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
+    "protoc-gen-go/descriptor",
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
@@ -205,7 +208,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3dfec3aaa0914e1af33b6928788891d1561b914d03bfd2d524219ce3582bdb7c"
+  digest = "1:9d47e3bfd17da676795ae8be4bd591ee23e71fe3d44512bd44f2411a61bb07f5"
   name = "google.golang.org/api"
   packages = [
     "bigquery/v2",
@@ -216,6 +219,7 @@
     "internal",
     "iterator",
     "option",
+    "storage/v1",
     "transport/http",
     "transport/http/internal/propagation",
   ]
@@ -243,9 +247,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4136ec22e8bf3c8a03a97131d3a885e643f4c14288dfcdc32a6c08f556b7ed48"
+  digest = "1:a7d48ca460ca1b4f6ccd8c95502443afa05df88aee84de7dbeb667a8754e8fa6"
   name = "google.golang.org/genproto"
   packages = [
+    "googleapis/api/annotations",
+    "googleapis/iam/v1",
     "googleapis/rpc/code",
     "googleapis/rpc/status",
   ]
@@ -297,7 +303,9 @@
   analyzer-version = 1
   input-imports = [
     "cloud.google.com/go/bigquery",
+    "cloud.google.com/go/storage",
     "github.com/kris-nova/logger",
+    "github.com/kris-nova/lolgopher",
     "github.com/kubicorn/kubicorn/pkg/local",
     "github.com/spf13/cobra",
     "google.golang.org/api/iterator",
