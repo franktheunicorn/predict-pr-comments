@@ -82,8 +82,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
 	rootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
 	rootCmd.PersistentFlags().IntVarP(&queeropts.CellLimit, "cell-limit", "l", 100, "The number of cells per set to pull")
+	rootCmd.PersistentFlags().StringVarP(&queeropts.DateString, "date", "d", "yesterday", "The datstring to use such as 2018, 20190102, yesterday")
 	rootCmd.PersistentFlags().StringVarP(&queeropts.GoogleProject, "google-project", "p", "", "The name of the Google project to use")
 	rootCmd.PersistentFlags().StringVarP(&queeropts.PathToAuthFile, "auth-file", "a", fmt.Sprintf("%s/.google/auth.json", local.Home()), "The path to the Google auth file to use")
 	rootCmd.Flags().StringVarP(&outputFile, "output-file", "o", fmt.Sprintf("%s/predict-github-comments.csv", local.Home()), "The path to the Google auth file to use")
 	rootCmd.AddCommand(cloudCmd)
+	rootCmd.AddCommand(operatorCmd)
 }
