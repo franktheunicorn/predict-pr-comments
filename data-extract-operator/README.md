@@ -5,13 +5,23 @@ A Go library and CLI tool that can optionally be ran as a Kubernetes operator th
 ### Building the program
 
  1) Install [Go](https://golang.org/doc/install)
- 2) Edit either the `run.sh`, `cloud.sh` or `operator.sh` file to fit your setup
- 3) Run `run.sh`
-
-### Output to file
-
-Run the program with no other verbs.
-
-```bash 
-data-extract-operator <flags> -o /path/to/desired/output.csv
-```
+ 
+ Compile the binary
+ 
+ ```bash
+ make build
+ ```
+ 
+ 2) Build and push container container
+ 
+ ```bash
+ make container push
+ ```
+ 
+ 3) Run in Kubernetes
+ 
+ ```bash
+ make deploy
+ ```
+ 
+ Note: you probably have to edit the makefile to fit your local build system!
