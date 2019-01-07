@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright © 2018 Kris Nova <kris@nivenly.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +14,8 @@
 # limitations under the License.
 
 set -e
-go install .
-data-extract-operator operator \
+make build
+deo operator \
     --google-project boos-demo-projects-are-rad \
     --cell-limit 1000 \
     --auth-file ~/.nova_credentials.json 

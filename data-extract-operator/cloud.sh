@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright © 2018 Kris Nova <kris@nivenly.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 set -e
-go install .
-data-extract-operator cloud \
+make build
+deo cloud \
     --google-project boos-demo-projects-are-rad \
     --cell-limit -1 \
-    --date 2015 \
+    --date 20190101 \
     --auth-file ~/.nova_credentials.json \
     --bucket tigeys-buckets-are-rad

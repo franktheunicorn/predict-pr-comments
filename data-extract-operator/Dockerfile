@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright © 2018 Kris Nova <kris@nivenly.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
-make build
-deo operator \
-    --google-project boos-demo-projects-are-rad \
-    --cell-limit -1 \
-    --auth-file ~/.nova_credentials.json \
-    --bucket tigeys-buckets-are-rad
+
+FROM golang:alpine AS builder
+COPY . $GOPATH/src/github.com/holdenk/predict-pr-comments/data-extract-operator
+WORKDIR $GOPATH/src/github.com/holdenk/predict-pr-comments/data-extract-operator
+RUN go build -o /go/bin/deo .
+
+FROM alpine
+RUN apk add --no-cache ca-certificates openssl
+COPY --from=builder /go/bin/deo /go/bin/deo
+ENTRYPOINT ["/go/bin/deo"]

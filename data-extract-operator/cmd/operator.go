@@ -79,6 +79,7 @@ func ControlLoop(cancel chan bool) chan error {
 			errch <- fmt.Errorf("Unable to create client: %v", err)
 			cancel <- true
 		}
+		first := true
 		for {
 			select {
 			case <-cancel:
@@ -86,6 +87,11 @@ func ControlLoop(cancel chan bool) chan error {
 			default:
 				// ----------------------------------------------------
 				{
+					if first != true {
+						time.Sleep(time.Minute * 15)
+					} else {
+						first = false
+					}
 					// Hacky way of getting yesterday
 					yesterday := strings.Replace(
 						strings.Split(
@@ -124,7 +130,7 @@ func ControlLoop(cancel chan bool) chan error {
 					} else {
 						logger.Always("File exists %s exists", objectName)
 					}
-					time.Sleep(time.Minute * 15)
+
 				}
 			}
 		}
