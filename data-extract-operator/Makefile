@@ -28,15 +28,23 @@ IMAGE_VERSION ?= $(shell git describe --always --dirty)
 IMAGE_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD | sed 's/\///g')
 GIT_REF = $(shell git rev-parse --short=8 --verify HEAD)
 
+# Change this to your secret!
+SECRET=/home/kris/.nova_credentials.json
+NAMESPACE=nova
+
 FMT_PKGS=$(shell go list -f {{.Dir}} ./... | grep -v vendor | tail -n +2)
 
 default: container push
 
 .PHONY: deploy
-deploy:
+secret: ## Generate Kubernetes secret
+	kubectl create secret generic gcloud --from-file $(SECRET) -n $(NAMESPACE)
+
+.PHONY: deploy
+deploy: ## Deploy to Kubernetes
 	. ./deploy.sh
 
-build:
+build: ## Compile the binary into $GOPATH
 	go build -o $(GOPATH)/bin/deo
 
 push: ## Push to the docker registry
