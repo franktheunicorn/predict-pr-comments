@@ -5,7 +5,7 @@ A Go library and CLI tool that can optionally be ran as a Kubernetes operator th
 ### Building the program
 
  1) Install [Go](https://golang.org/doc/install)
- 2) Edit the `run.sh` file to fit your setup
+ 2) Edit either the `run.sh`, `cloud.sh` or `operator.sh` file to fit your setup
  3) Run `run.sh`
 
 ### Output to file

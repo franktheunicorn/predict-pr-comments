@@ -1,0 +1,55 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: 2019-01-07T02:05:14Z
+  generation: 1
+  labels:
+    run: data-extract-operator
+  name: data-extract-operator
+  namespace: nova
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      run: data-extract-operator
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: data-extract-operator
+    spec:
+      containers:
+      - image: krisnova/data-extract-operator:latest
+        imagePullPolicy: Always
+        name: data-extract-operator
+        volumeMounts:
+          - name: gcloud
+            mountPath: "/etc/secret/gcloud"
+            readOnly: true
+        command: ["/go/bin/deo", "operator"]
+        args: ["--google-project", "boos-demo-projects-are-rad", "--cell-limit", "-1", "--auth-file", "/etc/secret/gcloud/.nova_credentials.json", "--bucket", "tigeys-buckets-are-rad"]
+        resources:
+          limits:
+            memory: "4G"
+          requests:
+            memory: "2G"
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      volumes:
+      - name: gcloud
+        secret:
+          secretName: gcloud
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
