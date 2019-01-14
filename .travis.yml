@@ -15,3 +15,5 @@ scala:
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 sudo: false
+script:
+  - cd sparkproject && sbt clean compile test
