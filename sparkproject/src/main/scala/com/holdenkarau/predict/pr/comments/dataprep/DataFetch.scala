@@ -10,6 +10,7 @@ import org.apache.spark.sql._
 import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
 import com.softwaremill.sttp._
+import com.softwaremill.sttp.asynchttpclient.future._
 
 import scala.concurrent._
 import scala.concurrent.duration.Duration
@@ -56,13 +57,14 @@ class DataFetch(sc: SparkContext) {
 
 object DataFetch {
   // Note if fetch patch is called inside the root JVM this might result in serilization "fun"
-  implicit lazy val sttpBackend = HttpURLConnectionBackend()
+  implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
+  import scala.concurrent.ExecutionContext.Implicits.global
 
-  def fetchPatch(record: InputData): (InputData, Response[String]) = {
+  def fetchPatch(record: InputData): Future[(InputData, Response[String])] = {
     val firstRequest = sttp
       .get(uri"${record.pull_patch_url}")
-    val response = firstRequest.send()
-    (record, response)
+    val responseFuture = firstRequest.send()
+    responseFuture.map(result => (record, result))
   }
 
   def processResponse(data: (InputData, Response[String])):
@@ -78,8 +80,9 @@ object DataFetch {
 
   def fetchPatchesIterator(records: Iterator[InputData]):
       Iterator[(InputData, StoredPatch)] = {
-    val responses = records.map(fetchPatch)
-    val result = responses.flatMap(processResponse)
+    val patchFutures = records.map(fetchPatch)
+    val resultFutures = patchFutures.map(future => future.map(processResponse))
+    val result = new BufferedFutureIterator(resultFutures).flatMap(x => x)
     result
   }
 }
