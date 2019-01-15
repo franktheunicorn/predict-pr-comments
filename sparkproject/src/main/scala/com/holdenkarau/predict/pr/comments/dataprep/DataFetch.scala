@@ -21,6 +21,13 @@ case class InputData(pull_request_url: String,
   pull_patch_url: String,
   comments_positions_space_delimited: String,
   comments_original_positions_space_delimited: String)
+case class ResultData(
+  pull_request_url: String,
+  pull_patch_url: String,
+  comments_positions_space_delimited: String,
+  comments_original_positions_space_delimited: String,
+  patch: String)
+
 
 class DataFetch(sc: SparkContext) {
   val session = SparkSession.builder().getOrCreate()
@@ -43,6 +50,21 @@ class DataFetch(sc: SparkContext) {
       case _ => session.emptyDataset[StoredPatch]
     }
     val patches = fetchPatches(inputData, cachedData)
+    cache match {
+      case Some(x) =>
+        patches.cache()
+        patches.map(_._2).write.format("parquet").mode(SaveMode.Append).save(x)
+      case _ => // No cahce, no problem!
+    }
+    val resultData = patches.map{case (input, patch) =>
+      ResultData(
+        input.pull_request_url,
+        input.pull_patch_url,
+        input.comments_positions_space_delimited,
+        input.comments_original_positions_space_delimited,
+        patch.patch)
+    }
+    resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
   /**
    * Fetches the github PR diff's for elements not found in the cache
