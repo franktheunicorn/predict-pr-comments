@@ -11,7 +11,6 @@ import org.scalatest.Matchers._
 
 class DataFetchTest extends FunSuite with SharedSparkContext {
   test("calling with a local file fetches a result") {
-    // TODO
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(List(
@@ -25,7 +24,6 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     result.count() should be (1)
   }
   test("cache records are filtered out") {
-    // TODO
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(List(

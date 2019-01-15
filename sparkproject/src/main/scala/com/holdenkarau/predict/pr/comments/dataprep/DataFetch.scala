@@ -74,7 +74,6 @@ class DataFetch(sc: SparkContext) {
    */
   def fetchPatches(inputData: Dataset[InputData], cachedData: Dataset[StoredPatch]):
       Dataset[(InputData, StoredPatch)] = {
-    //test needed
     val joinedData = inputData.join(cachedData,
       Seq("pull_request_url"),
       joinType = "left_anti")

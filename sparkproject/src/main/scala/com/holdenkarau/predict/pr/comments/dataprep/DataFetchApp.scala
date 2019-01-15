@@ -13,7 +13,7 @@ object DataFetchApp extends App{
     .setMaster("local")
     .setAppName("my awesome app")
 
-  Runner.run(conf, inputFile, outputFile, cachedFile)
+  MyRunner.run(conf, inputFile, outputFile, cachedFile)
 }
 
 /**
@@ -23,10 +23,10 @@ object DataFetchSCApp extends App{
   val (inputFile, outputFile, cachedFile) = (args(0), args(1), args(2))
 
   // spark-submit command should supply all necessary config elements
-  Runner.run(new SparkConf(), inputFile, outputFile, cachedFile)
+  MyRunner.run(new SparkConf(), inputFile, outputFile, cachedFile)
 }
 
-object Runner {
+private object MyRunner {
   def run(conf: SparkConf, inputFile: String, outputFile: String,
     cachedFile: String): Unit = {
 
