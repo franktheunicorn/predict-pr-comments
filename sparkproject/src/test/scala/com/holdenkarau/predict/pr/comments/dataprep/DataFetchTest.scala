@@ -1,7 +1,7 @@
 package com.holdenkarau.predict.pr.comments.sparkProject
 
 /**
- * A simple test for everyone's favourite wordcount example.
+ * A simple test for fetching github patches
  */
 
 import com.holdenkarau.spark.testing.SharedSparkContext
@@ -18,8 +18,11 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
       "https://api.github.com/repos/mick-warehime/sixth_corp/pulls/61,https://github.com/mick-warehime/sixth_corp/pull/61.patch,4 37 35 35 38 4 37 35 38,4 37 35 35 38 4 37 35 38"
     ))
     val inputData = session.read.option("header", "true").csv(session.createDataset(inputRDD)).as[InputData]
+    inputData.show()
+    println(inputData.collect()(0))
     val cachedData = session.emptyDataset[StoredPatch]
     val dataFetch = new DataFetch(sc)
-    val result = dataFetch.processInput(inputData, cachedData)
+    val result = dataFetch.fetchPatches(inputData, cachedData)
+    result.count()
   }
 }
