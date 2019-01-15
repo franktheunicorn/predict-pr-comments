@@ -6,6 +6,8 @@ package com.holdenkarau.predict.pr.comments.sparkProject
  * or blocking on long-pole items.
  */
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.collection.mutable.{ArrayBuffer, SynchronizedBuffer}
 import scala.collection.Iterator
 import scala.util.Try
@@ -18,31 +20,31 @@ class BufferedFutureIterator[T](
     extends Iterator[T] {
 
   // Futures which are waiting
-  protected val waitingBuffer: ArrayBuffer[Future[T]] = new ArrayBuffer[Future[T]]()
+  protected val waitingCount = new AtomicInteger()
   // Futures which are ready
   protected val readyBuffer: ArrayBuffer[Future[T]] = new ArrayBuffer[Future[T]]()
 
   def hasNext(): Boolean = {
     this.synchronized {
-      ! readyBuffer.isEmpty || ! waitingBuffer.isEmpty || baseItr.hasNext
+       (waitingCount.get > 0) || ! readyBuffer.isEmpty || baseItr.hasNext
     }
   }
 
   private def fill(): Unit = {
-    while (waitingBuffer.size + readyBuffer.size < bufferSize && baseItr.hasNext) {
+    while (waitingCount.get + readyBuffer.size < bufferSize && baseItr.hasNext) {
       // Try catch since we don't check hasNext in a sync block
       try {
         // Put the future in the waiting buffer
         val future = this.synchronized {
           val future = baseItr.next()
-          waitingBuffer += future
+          waitingCount.getAndIncrement
           future
         }
         // When the future completes move it between buffers
         def completeFun(f: Try[T]): Unit = {
           this.synchronized {
             readyBuffer += future
-            waitingBuffer -= future
+            waitingCount.getAndDecrement
           }
         }
         future onComplete completeFun
@@ -61,10 +63,7 @@ class BufferedFutureIterator[T](
       var resultOpt: Option[Future[T]] = None
       while (resultOpt.isEmpty) {
         fill()
-        // Wait for a future to finish
-        if (readyBuffer.isEmpty && !waitingBuffer.isEmpty) {
-          Future.firstCompletedOf(waitingBuffer)
-        }
+        Thread.sleep(1)
         this.synchronized {
           if (!readyBuffer.isEmpty) {
             val result = readyBuffer.head
