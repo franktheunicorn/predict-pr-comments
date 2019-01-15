@@ -7,6 +7,7 @@ package com.holdenkarau.predict.pr.comments.sparkProject
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
 import com.softwaremill.sttp._
@@ -33,6 +34,7 @@ class DataFetch(sc: SparkContext) {
   val session = SparkSession.builder().getOrCreate()
   import session.implicits._
 
+  // test needed
   /**
    * Fetch the github PR diffs
    */
@@ -72,8 +74,11 @@ class DataFetch(sc: SparkContext) {
    */
   def fetchPatches(inputData: Dataset[InputData], cachedData: Dataset[StoredPatch]):
       Dataset[(InputData, StoredPatch)] = {
-    // TODO -- use the cache to filter out from inputData
-    inputData.mapPartitions(DataFetch.fetchPatchesIterator)
+    //test needed
+    val joinedData = inputData.join(cachedData,
+      Seq("pull_request_url"),
+      joinType = "left_anti")
+    joinedData.as[InputData].mapPartitions(DataFetch.fetchPatchesIterator)
   }
 }
 
