@@ -16,4 +16,6 @@ after_success:
   - bash <(curl -s https://codecov.io/bash)
 sudo: false
 script:
-  - pushd sparkproject && sbt clean compile test scalastyle; popd
+  - pushd sparkproject
+  - sbt "set test in assembly := {}" clean compile test scalastyle assembly
+  - popd
