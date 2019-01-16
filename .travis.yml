@@ -16,4 +16,5 @@ after_success:
   - bash <(curl -s https://codecov.io/bash)
 sudo: false
 script:
-  - cd sparkproject && sbt clean compile test
+  - pushd sparkproject && sbt clean compile test scalastyle; popd
+  - pushd data-extract-operator && make clean build
