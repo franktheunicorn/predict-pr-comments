@@ -32,6 +32,6 @@ private object MyRunner {
 
     val sc = new SparkContext(conf)
     val dataFetch = new DataFetch(sc)
-    dataFetch.fetch(sc, inputFile, outputFile, Some(cachedFile))
+    dataFetch.fetch(inputFile, outputFile, Some(cachedFile))
   }
 }

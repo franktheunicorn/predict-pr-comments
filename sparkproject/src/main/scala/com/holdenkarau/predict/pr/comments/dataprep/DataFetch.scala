@@ -17,7 +17,7 @@ import scala.concurrent._
 import scala.concurrent.duration.Duration
 
 
-case class StoredPatch(pull_request_url: String, patch: String)
+case class StoredPatch(pull_request_url: String, patch: String, diff: String)
 case class InputData(pull_request_url: String,
   pull_patch_url: String,
   comments_positions_space_delimited: String,
@@ -27,7 +27,8 @@ case class ResultData(
   pull_patch_url: String,
   comments_positions_space_delimited: String,
   comments_original_positions_space_delimited: String,
-  patch: String)
+  patch: String,
+  diff: String)
 
 
 class DataFetch(sc: SparkContext) {
@@ -38,8 +39,7 @@ class DataFetch(sc: SparkContext) {
   /**
    * Fetch the github PR diffs
    */
-  def fetch(sc: SparkContext,
-    input: String,
+  def fetch(input: String,
     output: String,
     cache: Option[String]): Unit = {
     val rawInputData = session.read.format("csv").option("header", "true").option("inferSchema", "true").load(input)
@@ -64,7 +64,8 @@ class DataFetch(sc: SparkContext) {
         input.pull_patch_url,
         input.comments_positions_space_delimited,
         input.comments_original_positions_space_delimited,
-        patch.patch)
+        patch.patch,
+        patch.diff)
     }
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
@@ -86,21 +87,30 @@ object DataFetch {
   implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  def fetchPatch(record: InputData): Future[(InputData, Response[String])] = {
-    val firstRequest = sttp
+  def fetchPatch(record: InputData): Future[(InputData, Response[String], Response[String])] = {
+    val patchRequest = sttp
       .get(uri"${record.pull_patch_url}")
-    val responseFuture = firstRequest.send()
-    responseFuture.map(result => (record, result))
+    val patchResponseFuture = patchRequest.send()
+    val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
+    val diffRequest = sttp
+      .get(uri"${diffUrl}")
+    val diffResponseFuture = diffRequest.send()
+    val responseFuture = patchResponseFuture.zip(diffResponseFuture)
+    responseFuture.map{case (patch, diff) => (record, patch, diff)}
   }
 
-  def processResponse(data: (InputData, Response[String])):
+  def processResponse(data: (InputData, Response[String], Response[String])):
       Option[(InputData, StoredPatch)] = {
-    val (input, response) = data
+    val (input, patchResponse, diffResponse) = data
     // Skip errors, we have a lot of data
-    response.code match {
-      case StatusCodes.Ok =>
-        Some((input, StoredPatch(input.pull_request_url, response.unsafeBody)))
-      case _ => None
+    if (patchResponse.code == StatusCodes.Ok && diffResponse.code == StatusCodes.Ok) {
+      Some((input,
+        StoredPatch(
+          input.pull_request_url,
+          patchResponse.unsafeBody,
+          diffResponse.unsafeBody)))
+    } else {
+      None
     }
   }
 
