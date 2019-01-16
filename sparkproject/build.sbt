@@ -37,7 +37,9 @@ lazy val root = (project in file(".")).
     pomIncludeRepository := { x => false },
     mergeStrategy in assembly := {
       case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
-      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case m if m.endsWith("io.netty.versions.properties") => MergeStrategy.first
+        // Travis is giving a weird error on netty I don't see locally :(
+      case m if m.contains("META-INF/io.netty.versions.properties") => MergeStrategy.first
       case m if m.startsWith("META-INF/native/") => MergeStrategy.deduplicate
       case m if m.startsWith("META-INF") => MergeStrategy.discard
       case PathList("javax", "servlet", xs @ _*) => MergeStrategy.first
@@ -45,9 +47,9 @@ lazy val root = (project in file(".")).
       case PathList("org", "jboss", xs @ _*) => MergeStrategy.first
       case "about.html"  => MergeStrategy.rename
       case "reference.conf" => MergeStrategy.concat
-      case x =>
+      case m =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
-        oldStrategy(x)
+        oldStrategy(m)
     },
 
    resolvers ++= Seq(
