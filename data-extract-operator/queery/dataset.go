@@ -39,16 +39,18 @@ const (
 	// Query is our main query we can manipulate as needed. This is interpolated later so expect a few erroneous %'s
 	// Thanks to Holden Karau for writing the query <3
 	RawQuery = `SELECT pull_request_url,
-ANY_VALUE(pull_patch_url) as pull_patch_url,
-ARRAY_AGG(comment_position IGNORE NULLS) as comments_positions,
-ARRAY_AGG(comment_original_position IGNORE NULLS) as comments_original_positions
-FROM (SELECT *, JSON_EXTRACT(payload, '$.action')
-AS action, JSON_EXTRACT(payload, '$.pull_request.url')
-AS pull_request_url, JSON_EXTRACT(payload, '$.pull_request.patch_url') AS pull_patch_url,
-JSON_EXTRACT(payload, '$.comment.original_position') AS comment_original_position,
-JSON_EXTRACT(payload, '$.comment.position') AS comment_position
-FROM ` + "`githubarchive.day.%s*`" + `WHERE type = "PullRequestReviewCommentEvent"
-OR type = "PullRequestEvent2") GROUP BY pull_request_url
+ ANY_VALUE(pull_patch_url) as pull_patch_url,
+ ARRAY_AGG(comment_position) as comments_positions,
+ ARRAY_AGG(comment_original_position) as comments_original_positions,
+ ARRAY_AGG(comment_commit_id IGNORE NULLS) as comment_commit_ids,
+ ARRAY_AGG(comment_file_path IGNORE NULLS) as comment_file_paths  FROM (SELECT *, JSON_EXTRACT(payload, '$.action') AS action,
+ JSON_EXTRACT(payload, '$.pull_request.url') AS pull_request_url,
+ JSON_EXTRACT(payload, '$.pull_request.patch_url') AS pull_patch_url,
+ IFNULL(JSON_EXTRACT(payload, '$.comment.original_position'), "-1") AS comment_original_position,
+ IFNULL(JSON_EXTRACT(payload, '$.comment.position'), "-1") AS comment_position,
+ JSON_EXTRACT(payload, '$.comment.commit_id') AS comment_commit_id,
+ JSON_EXTRACT(payload, '$.comment.path') AS comment_file_path FROM ` + "`githubarchive.day.%s*`" +
+ `WHERE type = "PullRequestReviewCommentEvent" OR type = "PullRequestEvent2") GROUP BY pull_request_url
 %s`
 )
 
@@ -65,6 +67,13 @@ type Cell struct {
 	CommentsOriginalPositions               []string `json:"comments_original_positions"`
 	CommentsPositionsSpaceDelimited         string   `json:"comments_positions_space_delimited"`
 	CommentsOriginalPositionsSpaceDelimited string   `json:"comments_original_positions_space_delimited"`
+
+	// File names and commit hashes are represented as strings
+	CommentFilePaths                       []string `json:"comment_file_paths"`
+	CommentsCommitIds                      []string `json:"comment_commit_ids"`
+	CommentFilePathsJsonEncoded            string `json:"comment_file_paths_json_encoded"`
+	CommentsCommitIdsSpaceDelimited         string `json:"comment_commit_ids_space_delimited"`
+
 }
 
 var (
@@ -77,6 +86,8 @@ var (
 			"pull_patch_url",
 			"comments_positions_space_delimited",
 			"comments_original_positions_space_delimited",
+			"comment_file_paths_json_encoded",
+			"comment_commit_ids_space_delimited",
 		},
 	}
 )
@@ -181,6 +192,9 @@ func (d *DataSet) PostProcessFields() {
 		processedCell.PullRequestPatchURL = strings.Replace(cell.PullRequestPatchURL, `"`, "", -1)
 		processedCell.CommentsPositionsSpaceDelimited = strings.Join(cell.CommentsPositions, " ")
 		processedCell.CommentsOriginalPositionsSpaceDelimited = strings.Join(cell.CommentsOriginalPositions, " ")
+		processedCell.CommentsCommitIdsSpaceDelimited = strings.Join(cell.CommentsCommitIds, " ")
+		patchesJson, _ := json.Marshal(cell.CommentFilePaths)
+		processedCell.CommentFilePathsJsonEncoded = string(patchesJson)
 		d.Cells[i] = processedCell
 	}
 }
