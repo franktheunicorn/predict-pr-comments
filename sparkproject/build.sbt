@@ -1,5 +1,6 @@
 // give the user a nice default project!
 
+val sparkVersion = "2.4.0"
 lazy val root = (project in file(".")).
 
   settings(
@@ -10,9 +11,6 @@ lazy val root = (project in file(".")).
     name := "sparkProject",
     version := "0.0.1",
 
-    sparkVersion := "2.4.0",
-    sparkComponents := Seq(),
-
     javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
     javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled"),
     scalacOptions ++= Seq("-deprecation", "-unchecked"),
@@ -22,8 +20,7 @@ lazy val root = (project in file(".")).
     coverageHighlighting := true,
 
     libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-streaming" % "2.4.0" % "provided",
-      "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided",
+      "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
 
@@ -38,6 +35,22 @@ lazy val root = (project in file(".")).
 
     scalacOptions ++= Seq("-deprecation", "-unchecked"),
     pomIncludeRepository := { x => false },
+    mergeStrategy in assembly := {
+      case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.first
+        // Travis is giving a weird error on netty I don't see locally :(
+      case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
+      case PathList("META-INF", "native", xs @ _*) => MergeStrategy.deduplicate
+      case PathList("META-INF", xs @ _ *) => MergeStrategy.discard
+      case PathList("javax", "servlet", xs @ _*) => MergeStrategy.first
+      case PathList("org", "apache", xs @ _*) => MergeStrategy.first
+      case PathList("org", "jboss", xs @ _*) => MergeStrategy.first
+      case "about.html"  => MergeStrategy.rename
+      case "reference.conf" => MergeStrategy.concat
+      case m =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(m)
+    },
 
    resolvers ++= Seq(
       "sonatype-releases" at "https://oss.sonatype.org/content/repositories/releases/",
