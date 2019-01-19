@@ -16,25 +16,22 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/holdenk/predict-pr-comments/pull-request-suggester/webhookserver"
+	"github.com/kris-nova/logger"
+	"github.com/kris-nova/lolgopher"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"os"
 )
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "pull-request-suggester",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "HTTP server to serve as a webhook for Pull Request events",
+	Long:  `HTTP server to serve as a webhook for Pull Request events`,
 	Run: func(cmd *cobra.Command, args []string) {
-
+		// TODO handle errors
+		webhookserver.Register()
+		webhookserver.Serve()
 	},
 }
 
@@ -46,5 +43,9 @@ func Execute() {
 }
 
 func init() {
-	// flags
+	logger.FabulousTrueWriter = lol.NewTruecolorLolWriter()
+	RootCmd.PersistentFlags().BoolVarP(&logger.Fabulous, "fabulous", "f", false, "Toggle rainbow logs")
+	RootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
+	RootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
+
 }
