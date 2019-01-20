@@ -50,6 +50,8 @@ build: ## Compile the binary into $GOPATH
 ingress: ## Install ingress for the cluster
 	kubectl apply -f https://j.hept.io/contour-deployment-rbac
 
+tls: ## Install TLS for the cluster
+	kubectl apply -f ./cert-manager
 
 push: ## Push to the docker registry
 	$(DOCKER) push $(REGISTRY)/$(TARGET):$(GIT_REF)
