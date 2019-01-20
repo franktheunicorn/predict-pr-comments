@@ -29,11 +29,7 @@ class DataFetch(sc: SparkContext) {
   def fetch(input: String,
     output: String,
     cache: Option[String]): Unit = {
-    val rawInputData = session.read.format("csv")
-      .option("header", "true")
-      .option("inferSchema", "true")
-      .option("quote", "\"")
-      .load(input)
+    val rawInputData = loadInput(input)
     val inputData = rawInputData.as[InputData]
     // Check and see if we have data prom a previous run
     val fs = HDFileSystem.get(sc.hadoopConfiguration)
@@ -77,6 +73,23 @@ class DataFetch(sc: SparkContext) {
     }
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
+
+  def createCSVReader() = {
+    session.read.format("csv")
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .option("quote", "\"")
+      .option("escape", "\"")
+  }
+
+  def loadInput(input: String) = {
+    createCSVReader().load(input)
+  }
+
+  def loadInput(input: Dataset[String]) = {
+    createCSVReader.csv(input)
+  }
+
 
   def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
     // Strip out the "s because it's just a base64 string

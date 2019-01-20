@@ -18,8 +18,8 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
-    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
     val dataFetch = new DataFetch(sc)
+    val inputData = dataFetch.loadInput(session.createDataset(inputRDD)).as[InputData]
     val cleanedInputData = dataFetch.cleanInputs(inputData).collect()(0)
 
     inputData.collect()(0).comment_file_paths_json_encoded should be (
@@ -34,8 +34,8 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
-    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
     val dataFetch = new DataFetch(sc)
+    val inputData = dataFetch.loadInput(session.createDataset(inputRDD)).as[InputData]
     val cleanedInputData = dataFetch.cleanInputs(inputData)
     val cachedData = session.emptyDataset[StoredPatch]
     val result = dataFetch.fetchPatches(cleanedInputData, cachedData)
@@ -46,13 +46,13 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
-    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
+    val dataFetch = new DataFetch(sc)
+    val inputData = dataFetch.loadInput(session.createDataset(inputRDD)).as[InputData]
     val basicCached = StoredPatch(
       "https://api.github.com/repos/Dreamacro/clash/pulls/96",
       "notreal",
       "stillnotreal")
     val cachedData = session.createDataset(sc.parallelize(List(basicCached)))
-    val dataFetch = new DataFetch(sc)
     val cleanedInputData = dataFetch.cleanInputs(inputData)
     val result = dataFetch.fetchPatches(cleanedInputData, cachedData)
     result.count() should be (0)
