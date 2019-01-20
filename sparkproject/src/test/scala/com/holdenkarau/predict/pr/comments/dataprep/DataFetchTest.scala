@@ -11,9 +11,8 @@ import org.scalatest.Matchers._
 
 class DataFetchTest extends FunSuite with SharedSparkContext {
   val standardInputList = List(
-    "pull_request_url,pull_patch_url,comments_positions_space_delimited,comments_original_positions_space_delimited",
-    "https://api.github.com/repos/mick-warehime/sixth_corp/pulls/61,https://github.com/mick-warehime/sixth_corp/pull/61.patch,4 37 35 35 38 4 37 35 38,4 37 35 35 38 4 37 35 38")
-
+    """pull_request_url,pull_patch_url,comments_positions_space_delimited,comments_original_positions_space_delimited,comment_file_paths_json_encoded,comment_commit_ids_space_delimited""",
+    "https://api.github.com/repos/Wilfred/remacs/pulls/1220,https://github.com/Wilfred/remacs/pull/1220.patch,36 36 -1 36,36 36 5 36,\"[\"\"\\\"\"rust_src/src/eval.rs\"\"\"\",\"\"\\\"\"rust_src/src/eval.rs\\\"\"\"\",\"\"\\\"\"rust_src/src/eval_macros.rs\\\"\"\"\",\"\"\\\"\"rust_src/src/eval.rs\\\"\"\"\"]\",\"\"\"6cd460714aa3227e8f026a1dbadf9bdf57fa1ac6\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\"\"\"\"")
 
   test("calling with a local file fetches a result") {
     val session = SparkSession.builder().getOrCreate()

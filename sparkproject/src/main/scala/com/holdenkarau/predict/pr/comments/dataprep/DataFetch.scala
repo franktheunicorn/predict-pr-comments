@@ -16,17 +16,27 @@ import com.softwaremill.sttp.asynchttpclient.future._
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.core.`type`.TypeReference
+
 
 case class StoredPatch(pull_request_url: String, patch: String, diff: String)
-case class InputData(pull_request_url: String,
-  pull_patch_url: String,
-  comments_positions_space_delimited: String,
-  comments_original_positions_space_delimited: String)
-case class ResultData(
+case class InputData(
   pull_request_url: String,
   pull_patch_url: String,
   comments_positions_space_delimited: String,
   comments_original_positions_space_delimited: String,
+  comment_file_paths_json_encoded: String,
+  comment_commit_ids_space_delimited: String)
+case class ResultData(
+  pull_request_url: String,
+  pull_patch_url: String,
+  // Some comments might not resolve inside of the updated or original spaces
+  // hence the Option type.
+  comments_positions_space: List[Option[Int]],
+  comments_original_positions_space_delimited: List[Option[Int]],
+  comment_file_paths: List[String],
+  comment_commit_ids: List[String],
   patch: String,
   diff: String)
 
@@ -58,14 +68,29 @@ class DataFetch(sc: SparkContext) {
         patches.map(_._2).write.format("parquet").mode(SaveMode.Append).save(x)
       case _ => // No cahce, no problem!
     }
-    val resultData = patches.map{case (input, patch) =>
-      ResultData(
-        input.pull_request_url,
-        input.pull_patch_url,
-        input.comments_positions_space_delimited,
-        input.comments_original_positions_space_delimited,
-        patch.patch,
-        patch.diff)
+
+    val resultData = patches.mapPartitions{partition =>
+      // Todo move to the companion object + lazy val
+      val mapper = new ObjectMapper()
+      def processSpaceDelimCommentPos(input: String): List[Option[Int]] = {
+        input.split(" ").map{
+          case "-1" => None // Magic value for null
+          case x => Some(x.toInt) // Anything besides -1 should be fine
+        }.toList
+      }
+      def processPatch (result: (InputData, StoredPatch)): ResultData = {
+        val (input, patch) = result
+        ResultData(
+          input.pull_request_url,
+          input.pull_patch_url,
+          processSpaceDelimCommentPos(input.comments_positions_space_delimited),
+          processSpaceDelimCommentPos(input.comments_original_positions_space_delimited),
+          mapper.readValue[Array[String]](input.comment_file_paths_json_encoded, classOf[Array[String]]).toList,
+          input.comment_commit_ids_space_delimited.split(" ").toList.map(removeQoutes),
+          patch.patch,
+          patch.diff)
+      }
+      partition.map(processPatch)
     }
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
@@ -78,7 +103,8 @@ class DataFetch(sc: SparkContext) {
     val joinedData = inputData.join(cachedData,
       Seq("pull_request_url"),
       joinType = "left_anti")
-    joinedData.as[InputData].mapPartitions(DataFetch.fetchPatchesIterator)
+    val result = joinedData.as[InputData].mapPartitions(DataFetch.fetchPatchesIterator)
+    result
   }
 }
 
