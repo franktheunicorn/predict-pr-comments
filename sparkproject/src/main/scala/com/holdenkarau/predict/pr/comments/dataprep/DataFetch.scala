@@ -94,6 +94,8 @@ class DataFetch(sc: SparkContext) {
   def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
     // Strip out the "s because it's just a base64 string
     val processSpaceDelimCommitIdsUDF = udf(DataFetch.processSpaceDelimCommitIds _)
+    // Strip out the start end "s
+    val processPathsUDF = udf(DataFetch.processPaths _)
 
     val cleanedInputData = inputData.select(
       inputData("pull_request_url"),
@@ -102,8 +104,8 @@ class DataFetch(sc: SparkContext) {
         "comments_positions"),
       split(inputData("comments_original_positions_space_delimited"), " ").alias(
         "comments_original_positions"),
-      from_json(inputData("comment_file_paths_json_encoded"),
-        ArrayType(StringType)).alias("comment_file_paths"),
+      processPathsUDF(from_json(inputData("comment_file_paths_json_encoded"),
+        ArrayType(StringType))).alias("comment_file_paths"),
       processSpaceDelimCommitIdsUDF(
         split(inputData("comment_commit_ids_space_delimited"), " ")).alias(
         "comment_commit_ids")).as[ParsedInputData]
@@ -170,4 +172,7 @@ object DataFetch {
     input.map(_.replaceAll("\"", ""))
   }
 
+  def processPaths(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("^\"|\"$", ""))
+  }
 }

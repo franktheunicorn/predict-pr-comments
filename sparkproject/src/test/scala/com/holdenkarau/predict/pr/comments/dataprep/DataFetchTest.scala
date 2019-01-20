@@ -27,7 +27,7 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     cleanedInputData.comment_commit_ids should contain theSameElementsAs List(
       "de976981dff604f3f41167012ddb82b3e0c90e6d", "0b44c7a83aa400caf5db40975a75428682431309")
     cleanedInputData.comment_file_paths should contain theSameElementsAs List(
-      "\"rules/from_ipcidr.go\"", "\"rules/from_ipcidr.go\"")
+      "rules/from_ipcidr.go", "rules/from_ipcidr.go")
   }
 
   test("calling with a local file fetches a result") {
