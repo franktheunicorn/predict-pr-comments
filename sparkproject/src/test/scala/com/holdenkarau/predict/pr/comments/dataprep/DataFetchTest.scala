@@ -12,16 +12,33 @@ import org.scalatest.Matchers._
 class DataFetchTest extends FunSuite with SharedSparkContext {
   val standardInputList = List(
     """pull_request_url,pull_patch_url,comments_positions_space_delimited,comments_original_positions_space_delimited,comment_file_paths_json_encoded,comment_commit_ids_space_delimited""",
-    "https://api.github.com/repos/Wilfred/remacs/pulls/1220,https://github.com/Wilfred/remacs/pull/1220.patch,36 36 -1 36,36 36 5 36,\"[\"\"\\\"\"rust_src/src/eval.rs\"\"\"\",\"\"\\\"\"rust_src/src/eval.rs\\\"\"\"\",\"\"\\\"\"rust_src/src/eval_macros.rs\\\"\"\"\",\"\"\\\"\"rust_src/src/eval.rs\\\"\"\"\"]\",\"\"\"6cd460714aa3227e8f026a1dbadf9bdf57fa1ac6\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\" \"\"d24d56b1cd837491f6dee2b8129e104c6fbefaaf\"\"\"\"\"")
+    "https://api.github.com/repos/Dreamacro/clash/pulls/96,https://github.com/Dreamacro/clash/pull/96.patch,42 -1,42 42,\"[\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\",\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\"]\",\"\"\"de976981dff604f3f41167012ddb82b3e0c90e6d\"\" \"\"0b44c7a83aa400caf5db40975a75428682431309\"\"\"")
+
+  test("Cleaning input should work") {
+    val session = SparkSession.builder().getOrCreate()
+    import session.implicits._
+    val inputRDD = sc.parallelize(standardInputList)
+    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
+    val dataFetch = new DataFetch(sc)
+    val cleanedInputData = dataFetch.cleanInputs(inputData).collect()(0)
+
+    inputData.collect()(0).comment_file_paths_json_encoded should be (
+    """["\"rules/from_ipcidr.go\"","\"rules/from_ipcidr.go\""]""")
+    cleanedInputData.comment_commit_ids should contain theSameElementsAs List(
+      "de976981dff604f3f41167012ddb82b3e0c90e6d", "0b44c7a83aa400caf5db40975a75428682431309")
+    cleanedInputData.comment_file_paths should contain theSameElementsAs List(
+      "\"rules/from_ipcidr.go\"", "\"rules/from_ipcidr.go\"")
+  }
 
   test("calling with a local file fetches a result") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
-    val inputData = session.read.option("header", "true").csv(session.createDataset(inputRDD)).as[InputData]
-    val cachedData = session.emptyDataset[StoredPatch]
+    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
     val dataFetch = new DataFetch(sc)
-    val result = dataFetch.fetchPatches(inputData, cachedData)
+    val cleanedInputData = dataFetch.cleanInputs(inputData)
+    val cachedData = session.emptyDataset[StoredPatch]
+    val result = dataFetch.fetchPatches(cleanedInputData, cachedData)
     result.count() should be (1)
   }
 
@@ -29,14 +46,15 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
-    val inputData = session.read.option("header", "true").csv(session.createDataset(inputRDD)).as[InputData]
+    val inputData = session.read.option("header", "true").option("escape", "\"").csv(session.createDataset(inputRDD)).as[InputData]
     val basicCached = StoredPatch(
-      "https://api.github.com/repos/mick-warehime/sixth_corp/pulls/61",
+      "https://api.github.com/repos/Dreamacro/clash/pulls/96",
       "notreal",
       "stillnotreal")
     val cachedData = session.createDataset(sc.parallelize(List(basicCached)))
     val dataFetch = new DataFetch(sc)
-    val result = dataFetch.fetchPatches(inputData, cachedData)
+    val cleanedInputData = dataFetch.cleanInputs(inputData)
+    val result = dataFetch.fetchPatches(cleanedInputData, cachedData)
     result.count() should be (0)
   }
 

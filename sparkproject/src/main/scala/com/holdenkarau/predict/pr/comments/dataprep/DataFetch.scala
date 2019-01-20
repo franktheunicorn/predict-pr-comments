@@ -7,6 +7,7 @@ package com.holdenkarau.predict.pr.comments.sparkProject
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
@@ -15,30 +16,6 @@ import com.softwaremill.sttp.asynchttpclient.future._
 
 import scala.concurrent._
 import scala.concurrent.duration.Duration
-
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.core.`type`.TypeReference
-
-
-case class StoredPatch(pull_request_url: String, patch: String, diff: String)
-case class InputData(
-  pull_request_url: String,
-  pull_patch_url: String,
-  comments_positions_space_delimited: String,
-  comments_original_positions_space_delimited: String,
-  comment_file_paths_json_encoded: String,
-  comment_commit_ids_space_delimited: String)
-case class ResultData(
-  pull_request_url: String,
-  pull_patch_url: String,
-  // Some comments might not resolve inside of the updated or original spaces
-  // hence the Option type.
-  comments_positions_space: List[Option[Int]],
-  comments_original_positions_space_delimited: List[Option[Int]],
-  comment_file_paths: List[String],
-  comment_commit_ids: List[String],
-  patch: String,
-  diff: String)
 
 
 class DataFetch(sc: SparkContext) {
@@ -61,7 +38,9 @@ class DataFetch(sc: SparkContext) {
         session.read.format("parquet").load(x).as[StoredPatch]
       case _ => session.emptyDataset[StoredPatch]
     }
-    val patches = fetchPatches(inputData, cachedData)
+    val cleanedInputData = cleanInputs(inputData)
+
+    val patches = fetchPatches(cleanedInputData, cachedData)
     cache match {
       case Some(x) =>
         patches.cache()
@@ -70,23 +49,23 @@ class DataFetch(sc: SparkContext) {
     }
 
     val resultData = patches.mapPartitions{partition =>
-      // Todo move to the companion object + lazy val
-      val mapper = new ObjectMapper()
-      def processSpaceDelimCommentPos(input: String): List[Option[Int]] = {
-        input.split(" ").map{
+      def processSpaceDelimCommentPos(input: List[String]): List[Option[Int]] = {
+        input.map{
           case "-1" => None // Magic value for null
           case x => Some(x.toInt) // Anything besides -1 should be fine
         }.toList
       }
-      def processPatch (result: (InputData, StoredPatch)): ResultData = {
+
+
+      def processPatch (result: (ParsedInputData, StoredPatch)): ResultData = {
         val (input, patch) = result
         ResultData(
           input.pull_request_url,
           input.pull_patch_url,
-          processSpaceDelimCommentPos(input.comments_positions_space_delimited),
-          processSpaceDelimCommentPos(input.comments_original_positions_space_delimited),
-          mapper.readValue[Array[String]](input.comment_file_paths_json_encoded, classOf[Array[String]]).toList,
-          input.comment_commit_ids_space_delimited.split(" ").toList.map(removeQoutes),
+          processSpaceDelimCommentPos(input.comments_positions),
+          processSpaceDelimCommentPos(input.comments_original_positions),
+          input.comment_file_paths,
+          input.comment_commit_ids,
           patch.patch,
           patch.diff)
       }
@@ -94,16 +73,37 @@ class DataFetch(sc: SparkContext) {
     }
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
+
+  def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
+    // Strip out the "s because it's just a base64 string
+    val processSpaceDelimCommitIdsUDF = udf(DataFetch.processSpaceDelimCommitIds _)
+
+    val cleanedInputData = inputData.select(
+      inputData("pull_request_url"),
+      inputData("pull_patch_url"),
+      split(inputData("comments_positions_space_delimited"), " ").alias(
+        "comments_positions"),
+      split(inputData("comments_original_positions_space_delimited"), " ").alias(
+        "comments_original_positions"),
+      from_json(inputData("comment_file_paths_json_encoded"),
+        ArrayType(StringType)).alias("comment_file_paths"),
+      processSpaceDelimCommitIdsUDF(
+        split(inputData("comment_commit_ids_space_delimited"), " ")).alias(
+        "comment_commit_ids")).as[ParsedInputData]
+    cleanedInputData
+  }
+
   /**
    * Fetches the github PR diff's for elements not found in the cache
    * and returns the new patches.
    */
-  def fetchPatches(inputData: Dataset[InputData], cachedData: Dataset[StoredPatch]):
-      Dataset[(InputData, StoredPatch)] = {
+  def fetchPatches(inputData: Dataset[ParsedInputData], cachedData: Dataset[StoredPatch]):
+      Dataset[(ParsedInputData, StoredPatch)] = {
     val joinedData = inputData.join(cachedData,
       Seq("pull_request_url"),
       joinType = "left_anti")
-    val result = joinedData.as[InputData].mapPartitions(DataFetch.fetchPatchesIterator)
+    val result = joinedData.as[ParsedInputData].mapPartitions(
+      DataFetch.fetchPatchesIterator)
     result
   }
 }
@@ -113,7 +113,8 @@ object DataFetch {
   implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  def fetchPatch(record: InputData): Future[(InputData, Response[String], Response[String])] = {
+  def fetchPatch(record: ParsedInputData):
+      Future[(ParsedInputData, Response[String], Response[String])] = {
     val patchRequest = sttp
       .get(uri"${record.pull_patch_url}")
     val patchResponseFuture = patchRequest.send()
@@ -125,8 +126,8 @@ object DataFetch {
     responseFuture.map{case (patch, diff) => (record, patch, diff)}
   }
 
-  def processResponse(data: (InputData, Response[String], Response[String])):
-      Option[(InputData, StoredPatch)] = {
+  def processResponse(data: (ParsedInputData, Response[String], Response[String])):
+      Option[(ParsedInputData, StoredPatch)] = {
     val (input, patchResponse, diffResponse) = data
     // Skip errors, we have a lot of data
     if (patchResponse.code == StatusCodes.Ok && diffResponse.code == StatusCodes.Ok) {
@@ -140,11 +141,16 @@ object DataFetch {
     }
   }
 
-  def fetchPatchesIterator(records: Iterator[InputData]):
-      Iterator[(InputData, StoredPatch)] = {
+  def fetchPatchesIterator(records: Iterator[ParsedInputData]):
+      Iterator[(ParsedInputData, StoredPatch)] = {
     val patchFutures = records.map(fetchPatch)
     val resultFutures = patchFutures.map(future => future.map(processResponse))
     val result = new BufferedFutureIterator(resultFutures).flatMap(x => x)
     result
   }
+
+  def processSpaceDelimCommitIds(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("\"", ""))
+  }
+
 }
