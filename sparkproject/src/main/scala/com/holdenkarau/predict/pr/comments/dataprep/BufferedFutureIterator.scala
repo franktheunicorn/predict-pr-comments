@@ -50,6 +50,7 @@ class BufferedFutureIterator[T](
         future onComplete completeFun
       } catch {
         case e: java.util.NoSuchElementException => None
+        case _ => None // inet, etc.
       }
     }
   }
@@ -72,7 +73,12 @@ class BufferedFutureIterator[T](
           }
         }
       }
-    Await.result(resultOpt.get, Duration.Inf)
+      // Ignore any problems during waiting
+      try {
+        Await.result(resultOpt.get, Duration.Inf)
+      } catch {
+        case _ => None
+      }
     } else {
       throw new java.util.NoSuchElementException("Out of elements")
     }
