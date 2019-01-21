@@ -11,6 +11,7 @@ export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
 export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="24g"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
+export APP_NAME=${APP_NAME:="spark-data-fetcher"} + `date`
 pushd $SPARK_HOME
 ./bin/spark-submit --master k8s://http://127.0.0.1:8001  \
   --deploy-mode cluster --conf \
@@ -21,7 +22,8 @@ pushd $SPARK_HOME
  --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark3 \
  --conf spark.kubernetes.namespace=spark \
  --conf spark.kubernetes.executor.memoryOverhead=3000 \
- --conf spark.default.parallelism=$SPARK_DEFAULT_PARALLELISM
+ --conf spark.default.parallelism=$SPARK_DEFAULT_PARALLELISM \
+ --conf spark.app.name=$APP_NAME \
  $JAR \
  $INPUT $OUTPUT $CACHE
 popd
