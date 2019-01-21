@@ -15,7 +15,7 @@ pushd $SPARK_HOME
   --deploy-mode cluster --conf \
  spark.kubernetes.container.image=$DOCKER_REPO/spark:$SPARK_VERSION \
  --conf spark.executor.instances=$NUM_EXECS \
- --conf spark.executor.memory=$SPARK_EXEC_MEMORY
+ --conf spark.executor.memory=$SPARK_EXEC_MEMORY \
  --class com.holdenkarau.predict.pr.comments.sparkProject.DataFetchSCApp \
  --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark3 \
  --conf spark.kubernetes.namespace=spark \
