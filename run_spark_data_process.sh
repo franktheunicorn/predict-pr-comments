@@ -9,7 +9,7 @@ export OUTPUT=${OUTPUT:="gs://frank-the-unicorn/dev_output"}
 export CACHE=${CACHE:="gs://frank-the-unicorn/cache"}
 export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
-export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="8g"}
+export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="16g"}
 pushd $SPARK_HOME
 ./bin/spark-submit --master k8s://http://127.0.0.1:8001  \
   --deploy-mode cluster --conf \
