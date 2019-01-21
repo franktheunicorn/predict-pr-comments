@@ -19,6 +19,7 @@ pushd $SPARK_HOME
  --class com.holdenkarau.predict.pr.comments.sparkProject.DataFetchSCApp \
  --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark3 \
  --conf spark.kubernetes.namespace=spark \
+ --conf spark.kubernetes.executor.memoryOverhead=2500 \
  $JAR \
  $INPUT $OUTPUT $CACHE
 popd
