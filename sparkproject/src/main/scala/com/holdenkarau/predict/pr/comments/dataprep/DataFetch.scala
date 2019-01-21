@@ -85,7 +85,7 @@ class DataFetch(sc: SparkContext) {
   }
 
   def loadInput(input: String) = {
-    createCSVReader().load(input)
+    createCSVReader().load(input).repartition(1000)
   }
 
   def loadInput(input: Dataset[String]) = {
