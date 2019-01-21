@@ -6,7 +6,6 @@ cache:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
     - $HOME/.sbt/launchers
-    - $HOME/build
 
 jdk:
   - oraclejdk8
@@ -19,3 +18,6 @@ script:
   - pushd sparkproject
   - sbt "set test in assembly := {}" clean compile test scalastyle
   - popd
+before_cache:
+  # Problem with class files being annoying
+  - rm -rf sparkproject/target

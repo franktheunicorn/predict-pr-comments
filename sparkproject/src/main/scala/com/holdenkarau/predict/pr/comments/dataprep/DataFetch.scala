@@ -7,6 +7,7 @@ package com.holdenkarau.predict.pr.comments.sparkProject
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
@@ -15,20 +16,6 @@ import com.softwaremill.sttp.asynchttpclient.future._
 
 import scala.concurrent._
 import scala.concurrent.duration.Duration
-
-
-case class StoredPatch(pull_request_url: String, patch: String, diff: String)
-case class InputData(pull_request_url: String,
-  pull_patch_url: String,
-  comments_positions_space_delimited: String,
-  comments_original_positions_space_delimited: String)
-case class ResultData(
-  pull_request_url: String,
-  pull_patch_url: String,
-  comments_positions_space_delimited: String,
-  comments_original_positions_space_delimited: String,
-  patch: String,
-  diff: String)
 
 
 class DataFetch(sc: SparkContext) {
@@ -42,7 +29,7 @@ class DataFetch(sc: SparkContext) {
   def fetch(input: String,
     output: String,
     cache: Option[String]): Unit = {
-    val rawInputData = session.read.format("csv").option("header", "true").option("inferSchema", "true").load(input)
+    val rawInputData = loadInput(input)
     val inputData = rawInputData.as[InputData]
     // Check and see if we have data prom a previous run
     val fs = HDFileSystem.get(sc.hadoopConfiguration)
@@ -51,34 +38,92 @@ class DataFetch(sc: SparkContext) {
         session.read.format("parquet").load(x).as[StoredPatch]
       case _ => session.emptyDataset[StoredPatch]
     }
-    val patches = fetchPatches(inputData, cachedData)
+    val cleanedInputData = cleanInputs(inputData)
+
+    val patches = fetchPatches(cleanedInputData, cachedData)
     cache match {
       case Some(x) =>
         patches.cache()
         patches.map(_._2).write.format("parquet").mode(SaveMode.Append).save(x)
       case _ => // No cahce, no problem!
     }
-    val resultData = patches.map{case (input, patch) =>
-      ResultData(
-        input.pull_request_url,
-        input.pull_patch_url,
-        input.comments_positions_space_delimited,
-        input.comments_original_positions_space_delimited,
-        patch.patch,
-        patch.diff)
+
+    val resultData = patches.mapPartitions{partition =>
+      def processSpaceDelimCommentPos(input: List[String]): List[Option[Int]] = {
+        input.map{
+          case "-1" => None // Magic value for null
+          case x => Some(x.toInt) // Anything besides -1 should be fine
+        }.toList
+      }
+
+
+      def processPatch (result: (ParsedInputData, StoredPatch)): ResultData = {
+        val (input, patch) = result
+        ResultData(
+          input.pull_request_url,
+          input.pull_patch_url,
+          processSpaceDelimCommentPos(input.comments_positions),
+          processSpaceDelimCommentPos(input.comments_original_positions),
+          input.comment_file_paths,
+          input.comment_commit_ids,
+          patch.patch,
+          patch.diff)
+      }
+      partition.map(processPatch)
     }
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
+
+  def createCSVReader() = {
+    session.read.format("csv")
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .option("quote", "\"")
+      .option("escape", "\"")
+  }
+
+  def loadInput(input: String) = {
+    createCSVReader().load(input)
+  }
+
+  def loadInput(input: Dataset[String]) = {
+    createCSVReader.csv(input)
+  }
+
+
+  def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
+    // Strip out the "s because it's just a base64 string
+    val processSpaceDelimCommitIdsUDF = udf(DataFetch.processSpaceDelimCommitIds _)
+    // Strip out the start end "s
+    val processPathsUDF = udf(DataFetch.processPaths _)
+
+    val cleanedInputData = inputData.select(
+      inputData("pull_request_url"),
+      inputData("pull_patch_url"),
+      split(inputData("comments_positions_space_delimited"), " ").alias(
+        "comments_positions"),
+      split(inputData("comments_original_positions_space_delimited"), " ").alias(
+        "comments_original_positions"),
+      processPathsUDF(from_json(inputData("comment_file_paths_json_encoded"),
+        ArrayType(StringType))).alias("comment_file_paths"),
+      processSpaceDelimCommitIdsUDF(
+        split(inputData("comment_commit_ids_space_delimited"), " ")).alias(
+        "comment_commit_ids")).as[ParsedInputData]
+    cleanedInputData
+  }
+
   /**
    * Fetches the github PR diff's for elements not found in the cache
    * and returns the new patches.
    */
-  def fetchPatches(inputData: Dataset[InputData], cachedData: Dataset[StoredPatch]):
-      Dataset[(InputData, StoredPatch)] = {
+  def fetchPatches(inputData: Dataset[ParsedInputData], cachedData: Dataset[StoredPatch]):
+      Dataset[(ParsedInputData, StoredPatch)] = {
     val joinedData = inputData.join(cachedData,
       Seq("pull_request_url"),
       joinType = "left_anti")
-    joinedData.as[InputData].mapPartitions(DataFetch.fetchPatchesIterator)
+    val result = joinedData.as[ParsedInputData].mapPartitions(
+      DataFetch.fetchPatchesIterator)
+    result
   }
 }
 
@@ -87,7 +132,8 @@ object DataFetch {
   implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  def fetchPatch(record: InputData): Future[(InputData, Response[String], Response[String])] = {
+  def fetchPatch(record: ParsedInputData):
+      Future[(ParsedInputData, Response[String], Response[String])] = {
     val patchRequest = sttp
       .get(uri"${record.pull_patch_url}")
     val patchResponseFuture = patchRequest.send()
@@ -99,8 +145,8 @@ object DataFetch {
     responseFuture.map{case (patch, diff) => (record, patch, diff)}
   }
 
-  def processResponse(data: (InputData, Response[String], Response[String])):
-      Option[(InputData, StoredPatch)] = {
+  def processResponse(data: (ParsedInputData, Response[String], Response[String])):
+      Option[(ParsedInputData, StoredPatch)] = {
     val (input, patchResponse, diffResponse) = data
     // Skip errors, we have a lot of data
     if (patchResponse.code == StatusCodes.Ok && diffResponse.code == StatusCodes.Ok) {
@@ -114,11 +160,19 @@ object DataFetch {
     }
   }
 
-  def fetchPatchesIterator(records: Iterator[InputData]):
-      Iterator[(InputData, StoredPatch)] = {
+  def fetchPatchesIterator(records: Iterator[ParsedInputData]):
+      Iterator[(ParsedInputData, StoredPatch)] = {
     val patchFutures = records.map(fetchPatch)
     val resultFutures = patchFutures.map(future => future.map(processResponse))
     val result = new BufferedFutureIterator(resultFutures).flatMap(x => x)
     result
+  }
+
+  def processSpaceDelimCommitIds(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("\"", ""))
+  }
+
+  def processPaths(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("^\"|\"$", ""))
   }
 }
