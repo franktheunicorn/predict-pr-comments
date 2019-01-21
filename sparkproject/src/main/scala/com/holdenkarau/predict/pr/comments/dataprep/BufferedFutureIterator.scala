@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.mutable.{ArrayBuffer, SynchronizedBuffer}
 import scala.collection.Iterator
-import scala.util.Try
+import scala.util.{Try, Success, Failure}
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 
@@ -22,7 +22,7 @@ class BufferedFutureIterator[T](
   // Futures which are waiting
   protected val waitingCount = new AtomicInteger()
   // Futures which are ready
-  protected val readyBuffer: ArrayBuffer[Future[T]] = new ArrayBuffer[Future[T]]()
+  protected val readyBuffer: ArrayBuffer[T] = new ArrayBuffer[T]()
 
   def hasNext(): Boolean = {
     this.synchronized {
@@ -41,32 +41,37 @@ class BufferedFutureIterator[T](
           future
         }
         // When the future completes move it between buffers
-        def completeFun(f: Try[T]): Unit = {
-          this.synchronized {
-            readyBuffer += future
+        future.andThen{
+          case Success(v) =>
+            this.synchronized {
+              waitingCount.getAndDecrement
+              readyBuffer += v
+            }
+          case Failure(e) =>
             waitingCount.getAndDecrement
-          }
         }
-        future onComplete completeFun
       } catch {
         case e: java.util.NoSuchElementException => None
-        case _ => None // inet, etc.
       }
     }
   }
 
 
   def next(): Option[T] = {
+    // Special case where we have no buffer
     if (bufferSize <= 0) {
       try {
         Some(Await.result(baseItr.next(), Duration.Inf))
       } catch {
         case _ => None
       }
+    // Normal run path
     } else if (hasNext()) {
       fill()
-      var resultOpt: Option[Future[T]] = None
-      while (resultOpt.isEmpty) {
+      var resultOpt: Option[T] = None
+      // An elem might fail in which case has next _could_ go to false even if we started
+      // with true, then we just want to return None
+      while (hasNext() && resultOpt.isEmpty) {
         fill()
         Thread.sleep(1)
         this.synchronized {
@@ -77,12 +82,7 @@ class BufferedFutureIterator[T](
           }
         }
       }
-      // Ignore any problems during waiting
-      try {
-        Some(Await.result(resultOpt.get, Duration.Inf))
-      } catch {
-        case _ => None
-      }
+      resultOpt
     } else {
       throw new java.util.NoSuchElementException("Out of elements")
     }
