@@ -17,7 +17,7 @@ import scala.concurrent.duration.Duration
 class BufferedFutureIterator[T](
   baseItr: Iterator[Future[T]], bufferSize: Int = 8)
   (implicit ec: ExecutionContext)
-    extends Iterator[T] {
+    extends Iterator[Option[T]] {
 
   // Futures which are waiting
   protected val waitingCount = new AtomicInteger()
@@ -56,9 +56,13 @@ class BufferedFutureIterator[T](
   }
 
 
-  def next(): T = {
+  def next(): Option[T] = {
     if (bufferSize <= 0) {
-      Await.result(baseItr.next(), Duration.Inf)
+      try {
+        Some(Await.result(baseItr.next(), Duration.Inf))
+      } catch {
+        case _ => None
+      }
     } else if (hasNext()) {
       fill()
       var resultOpt: Option[Future[T]] = None
@@ -75,7 +79,7 @@ class BufferedFutureIterator[T](
       }
       // Ignore any problems during waiting
       try {
-        Await.result(resultOpt.get, Duration.Inf)
+        Some(Await.result(resultOpt.get, Duration.Inf))
       } catch {
         case _ => None
       }

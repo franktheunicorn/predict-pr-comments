@@ -42,7 +42,7 @@ object BufferedFutureIteratorTest {
     val futureIterators = iterators.map(itr => itr.map(Future.successful(_)))
     val bufferedIterators = futureIterators.map(
       new BufferedFutureIterator(_, bufferSize=bufferSize))
-    val results = bufferedIterators.map(_.toList)
+    val results = bufferedIterators.map(_.flatMap(x => x).toList)
     val compare = inputs.zip(results)
     compare.foreach{case (origin, result) =>
       origin should contain theSameElementsAs result}
@@ -60,7 +60,7 @@ object BufferedFutureIteratorTest {
     }
     val bufferedIterator = new BufferedFutureIterator(futureIterator,
       bufferSize=bufferSize)
-    val results = bufferedIterator.toList
+    val results = bufferedIterator.flatMap(x => x).toList
     val original = inputs.map(_._1)
     original should contain theSameElementsAs results
   }

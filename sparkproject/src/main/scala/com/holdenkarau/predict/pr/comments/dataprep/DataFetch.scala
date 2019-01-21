@@ -166,7 +166,8 @@ object DataFetch {
       Iterator[(ParsedInputData, StoredPatch)] = {
     val patchFutures = records.map(fetchPatch)
     val resultFutures = patchFutures.map(future => future.map(processResponse))
-    val result = new BufferedFutureIterator(resultFutures).flatMap(x => x)
+    val result = new BufferedFutureIterator(resultFutures)
+      .flatMap(x => x).flatMap(x => x)
     result
   }
 
