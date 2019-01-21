@@ -9,7 +9,6 @@ import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
-import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future._
@@ -32,10 +31,13 @@ class DataFetch(sc: SparkContext) {
     val rawInputData = loadInput(input)
     val inputData = rawInputData.as[InputData]
     // Check and see if we have data prom a previous run
-    val fs = HDFileSystem.get(sc.hadoopConfiguration)
     val cachedData = cache match {
-      case Some(x) if fs.exists(new HDPath(x)) =>
-        session.read.format("parquet").load(x).as[StoredPatch]
+      case Some(x) =>
+        try {
+          session.read.format("parquet").load(x).as[StoredPatch]
+        } catch {
+          case _ => session.emptyDataset[StoredPatch]
+        }
       case _ => session.emptyDataset[StoredPatch]
     }
     val cleanedInputData = cleanInputs(inputData)
