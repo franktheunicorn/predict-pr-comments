@@ -9,7 +9,6 @@ import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
-import org.apache.hadoop.fs.{FileSystem => HDFileSystem, Path => HDPath}
 
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future._
@@ -32,10 +31,13 @@ class DataFetch(sc: SparkContext) {
     val rawInputData = loadInput(input)
     val inputData = rawInputData.as[InputData]
     // Check and see if we have data prom a previous run
-    val fs = HDFileSystem.get(sc.hadoopConfiguration)
     val cachedData = cache match {
-      case Some(x) if fs.exists(new HDPath(x)) =>
-        session.read.format("parquet").load(x).as[StoredPatch]
+      case Some(x) =>
+        try {
+          session.read.format("parquet").load(x).as[StoredPatch]
+        } catch {
+          case _ => session.emptyDataset[StoredPatch]
+        }
       case _ => session.emptyDataset[StoredPatch]
     }
     val cleanedInputData = cleanInputs(inputData)
@@ -83,7 +85,10 @@ class DataFetch(sc: SparkContext) {
   }
 
   def loadInput(input: String) = {
-    createCSVReader().load(input)
+    // Use default parallelism for the input because the other values
+    // do it based on the input layout and our input is not well partitioned.
+    val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
+    createCSVReader().load(input).repartition(inputParallelism)
   }
 
   def loadInput(input: Dataset[String]) = {
@@ -92,22 +97,28 @@ class DataFetch(sc: SparkContext) {
 
 
   def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
+    // Filter out bad records
+    val filteredInput = inputData.na.drop("any",
+      List("pull_request_url", "pull_patch_url"))
+      .filter(!($"pull_request_url" === "null"))
+      .filter(!($"pull_patch_url" === "null"))
+
     // Strip out the "s because it's just a base64 string
     val processSpaceDelimCommitIdsUDF = udf(DataFetch.processSpaceDelimCommitIds _)
     // Strip out the start end "s
     val processPathsUDF = udf(DataFetch.processPaths _)
 
-    val cleanedInputData = inputData.select(
-      inputData("pull_request_url"),
-      inputData("pull_patch_url"),
-      split(inputData("comments_positions_space_delimited"), " ").alias(
+    val cleanedInputData = filteredInput.select(
+      filteredInput("pull_request_url"),
+      filteredInput("pull_patch_url"),
+      split(filteredInput("comments_positions_space_delimited"), " ").alias(
         "comments_positions"),
-      split(inputData("comments_original_positions_space_delimited"), " ").alias(
+      split(filteredInput("comments_original_positions_space_delimited"), " ").alias(
         "comments_original_positions"),
-      processPathsUDF(from_json(inputData("comment_file_paths_json_encoded"),
+      processPathsUDF(from_json(filteredInput("comment_file_paths_json_encoded"),
         ArrayType(StringType))).alias("comment_file_paths"),
       processSpaceDelimCommitIdsUDF(
-        split(inputData("comment_commit_ids_space_delimited"), " ")).alias(
+        split(filteredInput("comment_commit_ids_space_delimited"), " ")).alias(
         "comment_commit_ids")).as[ParsedInputData]
     cleanedInputData
   }
@@ -129,20 +140,25 @@ class DataFetch(sc: SparkContext) {
 
 object DataFetch {
   // Note if fetch patch is called inside the root JVM this might result in serilization "fun"
-  implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
+  @transient implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def fetchPatch(record: ParsedInputData):
       Future[(ParsedInputData, Response[String], Response[String])] = {
-    val patchRequest = sttp
-      .get(uri"${record.pull_patch_url}")
-    val patchResponseFuture = patchRequest.send()
-    val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
-    val diffRequest = sttp
-      .get(uri"${diffUrl}")
-    val diffResponseFuture = diffRequest.send()
-    val responseFuture = patchResponseFuture.zip(diffResponseFuture)
-    responseFuture.map{case (patch, diff) => (record, patch, diff)}
+    try {
+      val patchRequest = sttp
+        .get(uri"${record.pull_patch_url}")
+      val patchResponseFuture = patchRequest.send()
+      val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
+      val diffRequest = sttp
+        .get(uri"${diffUrl}")
+      val diffResponseFuture = diffRequest.send()
+      val responseFuture = patchResponseFuture.zip(diffResponseFuture)
+      responseFuture.map{case (patch, diff) => (record, patch, diff)}
+    } catch {
+      case e: Exception => // We can get null pointers and other weird errors trying to fetch
+        Future.failed[(ParsedInputData, Response[String], Response[String])](e)
+    }
   }
 
   def processResponse(data: (ParsedInputData, Response[String], Response[String])):
@@ -164,7 +180,8 @@ object DataFetch {
       Iterator[(ParsedInputData, StoredPatch)] = {
     val patchFutures = records.map(fetchPatch)
     val resultFutures = patchFutures.map(future => future.map(processResponse))
-    val result = new BufferedFutureIterator(resultFutures).flatMap(x => x)
+    val result = new BufferedFutureIterator(resultFutures)
+      .flatMap(x => x).flatMap(x => x)
     result
   }
 
