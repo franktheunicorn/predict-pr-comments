@@ -1,4 +1,4 @@
-package com.holdenkarau.predict.pr.comments.sparkProject
+package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
 /**
  * A simple test for everyone's favourite wordcount example.
