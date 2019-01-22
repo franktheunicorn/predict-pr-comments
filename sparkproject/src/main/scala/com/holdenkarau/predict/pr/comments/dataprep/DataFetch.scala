@@ -134,20 +134,25 @@ class DataFetch(sc: SparkContext) {
 
 object DataFetch {
   // Note if fetch patch is called inside the root JVM this might result in serilization "fun"
-  implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
+  @transient implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def fetchPatch(record: ParsedInputData):
       Future[(ParsedInputData, Response[String], Response[String])] = {
-    val patchRequest = sttp
-      .get(uri"${record.pull_patch_url}")
-    val patchResponseFuture = patchRequest.send()
-    val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
-    val diffRequest = sttp
-      .get(uri"${diffUrl}")
-    val diffResponseFuture = diffRequest.send()
-    val responseFuture = patchResponseFuture.zip(diffResponseFuture)
-    responseFuture.map{case (patch, diff) => (record, patch, diff)}
+    try {
+      val patchRequest = sttp
+        .get(uri"${record.pull_patch_url}")
+      val patchResponseFuture = patchRequest.send()
+      val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
+      val diffRequest = sttp
+        .get(uri"${diffUrl}")
+      val diffResponseFuture = diffRequest.send()
+      val responseFuture = patchResponseFuture.zip(diffResponseFuture)
+      responseFuture.map{case (patch, diff) => (record, patch, diff)}
+    } catch {
+      case e: Exception => // We can get null pointers and other weird errors trying to fetch
+        Future[(ParsedInputData, Response[String], Response[String])].failed(e)
+    }
   }
 
   def processResponse(data: (ParsedInputData, Response[String], Response[String])):

@@ -9,9 +9,11 @@ export OUTPUT=${OUTPUT:="gs://frank-the-unicorn/dev/output"}
 export CACHE=${CACHE:="gs://frank-the-unicorn/dev/cache"}
 export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
-export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="24g"}
+export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="21g"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
-export APP_NAME=${APP_NAME:="spark-data-fetcher"} + `date`
+export APP_NAME=${APP_NAME:="spark-data-fetcher"}
+export RUNDATE=$(date +"%T")
+export APP_NAME="$APP_NAME-$RUNDATE"
 pushd $SPARK_HOME
 ./bin/spark-submit --master k8s://http://127.0.0.1:8001  \
   --deploy-mode cluster --conf \
