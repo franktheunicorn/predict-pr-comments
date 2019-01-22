@@ -1,4 +1,4 @@
-package com.holdenkarau.predict.pr.comments.sparkProject
+package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -11,7 +11,6 @@ object DataFetchApp extends App{
   val (inputFile, outputFile, cachedFile) = (args(0), args(1), args(2))
   val conf = new SparkConf()
     .setMaster("local")
-    .setAppName("my awesome app")
 
   MyRunner.run(conf, inputFile, outputFile, cachedFile)
 }

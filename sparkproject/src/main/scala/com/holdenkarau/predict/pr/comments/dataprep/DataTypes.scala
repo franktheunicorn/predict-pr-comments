@@ -1,4 +1,4 @@
-package com.holdenkarau.predict.pr.comments.sparkProject
+package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
 case class StoredPatch(pull_request_url: String, patch: String, diff: String)
 case class InputData(
