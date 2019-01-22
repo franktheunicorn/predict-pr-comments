@@ -97,22 +97,28 @@ class DataFetch(sc: SparkContext) {
 
 
   def cleanInputs(inputData: Dataset[InputData]): Dataset[ParsedInputData] = {
+    // Filter out bad records
+    val filteredInput = inputData.na.drop("any",
+      List("pull_request_url", "pull_patch_url"))
+      .filter(!($"pull_request_url" === "null"))
+      .filter(!($"pull_patch_url" === "null"))
+
     // Strip out the "s because it's just a base64 string
     val processSpaceDelimCommitIdsUDF = udf(DataFetch.processSpaceDelimCommitIds _)
     // Strip out the start end "s
     val processPathsUDF = udf(DataFetch.processPaths _)
 
-    val cleanedInputData = inputData.select(
-      inputData("pull_request_url"),
-      inputData("pull_patch_url"),
-      split(inputData("comments_positions_space_delimited"), " ").alias(
+    val cleanedInputData = filteredInput.select(
+      filteredInput("pull_request_url"),
+      filteredInput("pull_patch_url"),
+      split(filteredInput("comments_positions_space_delimited"), " ").alias(
         "comments_positions"),
-      split(inputData("comments_original_positions_space_delimited"), " ").alias(
+      split(filteredInput("comments_original_positions_space_delimited"), " ").alias(
         "comments_original_positions"),
-      processPathsUDF(from_json(inputData("comment_file_paths_json_encoded"),
+      processPathsUDF(from_json(filteredInput("comment_file_paths_json_encoded"),
         ArrayType(StringType))).alias("comment_file_paths"),
       processSpaceDelimCommitIdsUDF(
-        split(inputData("comment_commit_ids_space_delimited"), " ")).alias(
+        split(filteredInput("comment_commit_ids_space_delimited"), " ")).alias(
         "comment_commit_ids")).as[ParsedInputData]
     cleanedInputData
   }
@@ -151,7 +157,7 @@ object DataFetch {
       responseFuture.map{case (patch, diff) => (record, patch, diff)}
     } catch {
       case e: Exception => // We can get null pointers and other weird errors trying to fetch
-        Future[(ParsedInputData, Response[String], Response[String])].failed(e)
+        Future.failed[(ParsedInputData, Response[String], Response[String])](e)
     }
   }
 
