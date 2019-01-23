@@ -26,3 +26,6 @@ case class ResultData(
   comment_commit_ids: List[String],
   patch: String,
   diff: String)
+case class PatchRecord(commitId: String, oldPos: Int, newNumber: Int, text: String,
+  add: Boolean)
+case class DiffRecord(newNumber: Int, text: String)

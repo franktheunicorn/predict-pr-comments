@@ -3,6 +3,8 @@ package com.holdenkarau.predict.pr.comments.sparkProject.helper
  * Test of the Patch extractor
  */
 
+import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.PatchRecord
+
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

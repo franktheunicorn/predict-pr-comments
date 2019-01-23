@@ -1,10 +1,8 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.helper
 
+import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.PatchRecord
 import scala.util.matching.Regex
 
-case class PatchRecord(commitId: String, oldPos: Int, newNumber: Int, text: String,
-  add: Boolean)
-case class DiffRecord(newNumber: Int, text: String)
 
 object PatchExtractor {
   val commitRegex = """^From\s([A-Za-z0-9]+)\s.*$""".r
