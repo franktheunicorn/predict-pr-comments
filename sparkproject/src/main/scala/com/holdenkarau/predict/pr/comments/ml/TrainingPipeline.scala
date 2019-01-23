@@ -34,7 +34,7 @@ class TrainingPipeline(sc: SparkContext) {
     val recordsWithExtension = labeledRecords.withColumn(
       "extension", extractExtensionUDF(labeledRecords("filename")))
       .withColumn(
-        "commentedLabel", col("commented").cast("double"))
+        "label", col("commented").cast("double"))
     val pipeline = new Pipeline()
     // Turn our different file names into string indexes
     val extensionIndexer = new StringIndexer()
@@ -48,10 +48,16 @@ class TrainingPipeline(sc: SparkContext) {
     val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler().setInputCols(
-      List("wordvecs", "extension_index").toArray)
+      List("wordvecs", "extension_index").toArray).setOutputCol("features")
     // Create our simple random forest
     val forest = new RandomForestClassifier()
-    pipeline.setStages(List(extensionIndexer, tokenizer, word2vec).toArray)
+      .setFeaturesCol("features").setLabelCol("label")
+    pipeline.setStages(List(
+      extensionIndexer,
+      tokenizer,
+      word2vec,
+      featureVec,
+      forest).toArray)
     pipeline.fit(recordsWithExtension)
   }
 }
