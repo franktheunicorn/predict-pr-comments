@@ -34,7 +34,13 @@ class TrainingPipeline(sc: SparkContext) {
     val recordsWithExtension = labeledRecords.withColumn(
       "extension", extractExtensionUDF(labeledRecords("filename")))
     val pipeline = new Pipeline()
-
+    // Turn our different file names into string indexes
+    val extensionIndexer = new StringIndexer()
+      .setHandleInvalid("skip") // Some files no extensions
+      .setInputCol("extension")
+      .setOutputCol("extension_index")
+    pipeline.setStages(List(extensionIndexer).toArray)
+    pipeline.fit(recordsWithExtension)
   }
 }
 
