@@ -1,5 +1,6 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.helper
 
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql._
 
 /**
@@ -8,8 +9,12 @@ import org.apache.spark.sql._
 object PatchTestAppSC extends App {
   val (inputFile, outputFile) = (args(0), args(1))
   val session = SparkSession.builder.getOrCreate()
+  val sc = new SparkContext(new SparkConf())
   import session.implicits._
-  val input = session.read.format("parquet").load(inputFile).repartition(40)
+  // Use default parallelism for the input because the other values
+  // do it based on the input layout and our input is not well partitioned.
+  val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
+  val input = session.read.format("parquet").load(inputFile).repartition(inputParallelism)
   input.cache()
   input.count()
   val rejected = input.select("patch").as[String].flatMap {patch => 
