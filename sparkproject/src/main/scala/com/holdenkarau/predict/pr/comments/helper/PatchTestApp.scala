@@ -9,7 +9,9 @@ object PatchTestAppSC extends App {
   val (inputFile, outputFile) = (args(0), args(1))
   val session = SparkSession.builder.getOrCreate()
   import session.implicits._
-  val input = session.read.format("parquet").load(inputFile).select("patch").as[String]
+  val input = session.read.format("parquet").load(inputFile).select("patch").as[String].reparition(40)
+  input.cache()
+  input.count()
   val rejected = input.flatMap {patch => 
     try {
       PatchExtractor.processPatch(patch)
