@@ -57,8 +57,8 @@ object PatchExtractor {
           filename = f
           None
         case blockHeaderRegex(op, np) if seenDiff =>
-          oldPos = op.toInt
-          newPos = np.toInt
+          oldPos = op.toInt - 1
+          newPos = np.toInt - 1
           None
         case addedLine(lineText) if seenDiff && newPos != null =>
           newPos = newPos + 1

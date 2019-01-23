@@ -60,25 +60,124 @@ index 01aa14b..8aa21e7 100644
     val results = PatchExtractor.processPatch(simpleInput)
     val expected = List(
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        173,174,
+        172,173,
         "- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        35,36,
+        34,35,
 	"	metadata := parseHTTPAddr(request)",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        35,37,
+        34,36,
         "	metadata.SourceIP = parseSourceIP(conn)",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        37,38,
+        36,37,
         "		metadata: parseHTTPAddr(request),",
         false),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        37,39,
+        36,38,
         "		metadata: metadata,",
         true))
     results should contain theSameElementsAs expected
+  }
+  val slightlyComplexInput = """
+From a7fbc74335c2df27002e8158f8e83a919195eed7 Mon Sep 17 00:00:00 2001
+From: Holden Karau <holden@pigscanfly.ca>
+Date: Mon, 6 Aug 2018 11:04:31 -0700
+Subject: [PATCH 1/7] [SPARK-21436] Take advantage of known partioner for
+ distinct on RDDs to avoid a shuffle. Special case the situation where we know
+ the partioner and the number of requested partions output is the same as the
+ current partioner to avoid a shuffle and instead compute distinct inside of
+ each partion.
+
+---
+ core/src/main/scala/org/apache/spark/rdd/RDD.scala   | 11 ++++++++++-
+ .../test/scala/org/apache/spark/rdd/RDDSuite.scala   | 12 ++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/core/src/main/scala/org/apache/spark/rdd/RDD.scala b/core/src/main/scala/org/apache/spark/rdd/RDD.scala
+index 0574abdca32ac..471b9e0a1a877 100644
+--- a/core/src/main/scala/org/apache/spark/rdd/RDD.scala
++++ b/core/src/main/scala/org/apache/spark/rdd/RDD.scala
+@@ -396,7 +396,16 @@ abstract class RDD[T: ClassTag](
+    * Return a new RDD containing the distinct elements in this RDD.
+    */
+   def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] = withScope {
+-    map(x => (x, null)).reduceByKey((x, y) => x, numPartitions).map(_._1)
++    // If the data is already approriately partioned with a known partioner we can work locally.
++    def removeDuplicatesInPartition(itr: Iterator[T]): Iterator[T] = {
++      val set = new mutable.HashSet[T]() ++= itr
++      set.toIterator
++    }
++    partitioner match {
++      case Some(p) if numPartitions == partitions.length =>
++        mapPartitions(removeDuplicatesInPartition, preservesPartitioning = true)
++      case _ => map(x => (x, null)).reduceByKey((x, y) => x, numPartitions).map(_._1)
++    }
+   }
+ 
+   /**
+diff --git a/core/src/test/scala/org/apache/spark/rdd/RDDSuite.scala b/core/src/test/scala/org/apache/spark/rdd/RDDSuite.scala
+index b143a468a1baf..3001a2b005d8b 100644
+--- a/core/src/test/scala/org/apache/spark/rdd/RDDSuite.scala
++++ b/core/src/test/scala/org/apache/spark/rdd/RDDSuite.scala
+@@ -95,6 +95,18 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext {
+     assert(!deserial.toString().isEmpty())
+   }
+ 
++  test("distinct with known partioner does not cause shuffle") {
++    val rdd = sc.parallelize(1.to(100), 10).map(x => (x % 10, x % 10)).sortByKey()
++    val initialPartioner = rdd.partitioner
++    val distinctRdd = rdd.distinct()
++    val resultingPartioner = distinctRdd.partitioner
++    assert(initialPartioner === resultingPartioner)
++    val distinctRddDifferent = rdd.distinct(5)
++    val distinctRddDifferentPartioner = distinctRddDifferent.partitioner
++    assert(initialPartioner != distinctRddDifferentPartioner)
++    assert(distinctRdd.collect().sorted === distinctRddDifferent.collect().sorted)
++  }
++
+   test("countApproxDistinct") {
+ 
+     def error(est: Long, size: Long): Double = math.abs(est - size) / size.toDouble
+
+From 5fd36592a26b07fdb58e79e4efbb6b70daea54df Mon Sep 17 00:00:00 2001
+From: Holden Karau <holden@pigscanfly.ca>
+Date: Fri, 10 Aug 2018 11:10:31 -0700
+Subject: [PATCH 2/7] CR feedback, reduce # of passes over data from 2 to 1 and
+ fix some spelling issues.
+
+---
+ core/src/main/scala/org/apache/spark/rdd/RDD.scala   |  6 +++---
+ .../test/scala/org/apache/spark/rdd/RDDSuite.scala   | 12 ++++++------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/core/src/main/scala/org/apache/spark/rdd/RDD.scala b/core/src/main/scala/org/apache/spark/rdd/RDD.scala
+index 471b9e0a1a877..d9eff9f9b0ac1 100644
+--- a/core/src/main/scala/org/apache/spark/rdd/RDD.scala
++++ b/core/src/main/scala/org/apache/spark/rdd/RDD.scala
+@@ -396,10 +396,10 @@ abstract class RDD[T: ClassTag](
+    * Return a new RDD containing the distinct elements in this RDD.
+    */
+   def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] = withScope {
+-    // If the data is already approriately partioned with a known partioner we can work locally.
++    // If the data is already approriately partitioned with a known partitioner we can work locally.
+     def removeDuplicatesInPartition(itr: Iterator[T]): Iterator[T] = {
+-      val set = new mutable.HashSet[T]() ++= itr"""
+  test("Slightlycomplexinput") {
+    val results = PatchExtractor.processPatch(slightlyComplexInput)
+    val commits = results.map(_.commitId).distinct
+    val expectedCommits = List("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
+      "a7fbc74335c2df27002e8158f8e83a919195eed7")
+    val numAdded = results.filter(_.add).size
+    val numRemoved = results.filter(x => !x.add).size
+    commits should contain theSameElementsAs expectedCommits
+    numAdded should be (23)
+    numRemoved should be (3)
+    results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
+      399, 398,
+      "    // If the data is already approriately partioned with a known partioner we can work locally.",
+      false))
   }
 }
