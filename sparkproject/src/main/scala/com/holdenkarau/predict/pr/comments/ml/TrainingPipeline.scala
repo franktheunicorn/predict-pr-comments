@@ -23,6 +23,7 @@ class TrainingPipeline(sc: SparkContext) {
   import session.implicits._
 
   def trainAndSaveModel(input: String, output: String) = {
+    // TODO: Do this
   }
 
   def trainModel(input: Dataset[ResultData]) = {
@@ -70,6 +71,7 @@ object TrainingPipeline {
       case _ => None
     }
   }
+  // TODO: tests explicitly and seperately from rest of pipeline
   // Take an indivudal PR and produce a sequence of labeled records
   def produceRecord(input: ResultData): Seq[LabeledRecord] = {
     val commentsOnCommitIdsWithLineWithFile = input.comment_commit_ids
