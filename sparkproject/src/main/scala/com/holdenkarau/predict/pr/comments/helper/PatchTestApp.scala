@@ -8,8 +8,8 @@ import org.apache.spark.sql._
  */
 object PatchTestAppSC extends App {
   val (inputFile, outputFile) = (args(0), args(1))
-  val session = SparkSession.builder.getOrCreate()
   val sc = new SparkContext(new SparkConf())
+  val session = SparkSession.builder.getOrCreate()
   import session.implicits._
   // Use default parallelism for the input because the other values
   // do it based on the input layout and our input is not well partitioned.
