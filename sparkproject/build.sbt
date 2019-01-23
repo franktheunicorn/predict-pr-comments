@@ -21,6 +21,7 @@ lazy val root = (project in file(".")).
 
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+      "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
 
