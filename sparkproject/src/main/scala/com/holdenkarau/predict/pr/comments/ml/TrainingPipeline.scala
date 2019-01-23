@@ -8,7 +8,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.feature.{Word2Vec, Tokenizer, StringIndexer, SQLTransformer, VectorIndexer}
+import org.apache.spark.ml.feature.{Word2Vec, Tokenizer, StringIndexer, SQLTransformer, VectorAssembler}
 import org.apache.spark.ml.classification.{RandomForestClassificationModel, RandomForestClassifier}
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
@@ -36,10 +36,18 @@ class TrainingPipeline(sc: SparkContext) {
     val pipeline = new Pipeline()
     // Turn our different file names into string indexes
     val extensionIndexer = new StringIndexer()
-      .setHandleInvalid("skip") // Some files no extensions
+      .setHandleInvalid("keep") // Some files no extensions
       .setInputCol("extension")
       .setOutputCol("extension_index")
-    pipeline.setStages(List(extensionIndexer).toArray)
+    // For now we use the default tokenizer
+    // In the future we could be smart based on programming language
+    val tokenizer = new Tokenizer().setInputCol("text").setOutputCol("tokens")
+    // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
+    val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
+    // Create our charlie brown christmasstree esque feature vector
+    val featureVec = new VectorAssembler().setInputCols(
+      List("wordvecs", "extension_index").toArray)
+    pipeline.setStages(List(extensionIndexer, tokenizer, word2vec).toArray)
     pipeline.fit(recordsWithExtension)
   }
 }

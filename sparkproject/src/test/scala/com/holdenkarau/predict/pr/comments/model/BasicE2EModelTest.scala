@@ -12,15 +12,7 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 class BasicE2EModelTest extends FunSuite with SharedSparkContext {
-  test("empty smoke test") {
-    val session = SparkSession.builder().getOrCreate()
-    import session.implicits._
-    val input = session.emptyDataset[ResultData]
-    val trainer = new TrainingPipeline(sc)
-    val result = trainer.trainModel(input)
- }
-
-  test("less empty smoke test") {
+  test("tiny smoke test") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
