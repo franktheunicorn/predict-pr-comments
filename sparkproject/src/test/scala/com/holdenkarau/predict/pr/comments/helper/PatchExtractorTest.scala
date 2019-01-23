@@ -64,22 +64,27 @@ index 01aa14b..8aa21e7 100644
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         172,173,
         "- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT",
+        "README.md",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         34,35,
 	"	metadata := parseHTTPAddr(request)",
+        "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         34,36,
         "	metadata.SourceIP = parseSourceIP(conn)",
+        "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         36,37,
         "		metadata: parseHTTPAddr(request),",
+        "adapters/inbound/http.go",
         false),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         36,38,
         "		metadata: metadata,",
+        "adapters/inbound/http.go",
         true))
     results should contain theSameElementsAs expected
   }
@@ -180,6 +185,7 @@ index 471b9e0a1a877..d9eff9f9b0ac1 100644
     results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
       399, 398,
       "    // If the data is already approriately partioned with a known partioner we can work locally.",
+      "core/src/main/scala/org/apache/spark/rdd/RDD.scala",
       false))
   }
 }

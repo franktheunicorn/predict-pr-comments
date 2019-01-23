@@ -60,10 +60,10 @@ object PatchExtractor {
           None
         case addedLine(lineText) if seenDiff && newPos != null =>
           newPos = newPos + 1
-          Some(PatchRecord(commitId, oldPos, newPos, lineText, true))
+          Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, true))
         case removedLine(lineText) if seenDiff && newPos != null =>
           oldPos = oldPos + 1
-          Some(PatchRecord(commitId, oldPos, newPos, lineText, false))
+          Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, false))
         case _ if seenDiff && newPos != null =>
           // Context line
           newPos = newPos + 1
