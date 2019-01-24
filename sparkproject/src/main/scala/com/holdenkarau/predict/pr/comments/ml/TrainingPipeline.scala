@@ -26,16 +26,23 @@ class TrainingPipeline(sc: SparkContext) {
     // TODO: Do this
   }
 
-  def trainModel(input: Dataset[ResultData]) = {
+
+  // Produce data for training
+  def prepareTrainingData(input: Dataset[ResultData]) = {
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
     // The records can be annoying-ish to compute
     labeledRecords.cache()
     labeledRecords.count()
+    // Extract the extension and cast the label
     val extractExtensionUDF = udf(TrainingPipeline.extractExtension _)
-    val recordsWithExtension = labeledRecords.withColumn(
+    labeledRecords.withColumn(
       "extension", extractExtensionUDF(labeledRecords("filename")))
       .withColumn(
-        "label", col("commented").cast("double"))
+        "label", labeledRecords("commented").cast("double"))
+  }
+
+  def trainModel(input: Dataset[ResultData]) = {
+    val preparedTrainingData = prepareTrainingData(input)
     val pipeline = new Pipeline()
     // Turn our different file names into string indexes
     val extensionIndexer = new StringIndexer()
@@ -59,7 +66,7 @@ class TrainingPipeline(sc: SparkContext) {
       word2vec,
       featureVec,
       forest).toArray)
-    pipeline.fit(recordsWithExtension)
+    pipeline.fit(preparedTrainingData)
   }
 }
 

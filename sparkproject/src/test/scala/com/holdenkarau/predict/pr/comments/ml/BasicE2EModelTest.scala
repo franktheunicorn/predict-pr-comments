@@ -1,6 +1,7 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.ml
+
 /**
- * A simple test to make sure an individual model can be read through
+ * A simple test to make sure an individual model can be trained
  */
 import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.ResultData
 
@@ -19,6 +20,8 @@ class BasicE2EModelTest extends FunSuite with SharedSparkContext {
     val input = session.read.schema(schema).format("json").json(
       sc.parallelize(List(E2EModelSampleRecord.record))).as[ResultData]
     val trainer = new TrainingPipeline(sc)
-    val result = trainer.trainModel(input)
+    val pipelineModel = trainer.trainModel(input)
+    val transformedResult = pipelineModel.transform(
+      trainer.prepareTrainingData(input))
   }
 }
