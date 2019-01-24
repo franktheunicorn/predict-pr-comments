@@ -1,7 +1,9 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.ml
 
 import scala.collection.mutable.HashSet
+import scala.collection.immutable.{HashSet => ImmutableHashSet}
 import scala.util.matching.Regex
+import com.github.marklister.collections._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql._
@@ -13,7 +15,7 @@ import org.apache.spark.ml.classification.RandomForestClassifier
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
-import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.ResultData
+import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, PatchRecord}
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
 case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean)
@@ -26,16 +28,23 @@ class TrainingPipeline(sc: SparkContext) {
     // TODO: Do this
   }
 
-  def trainModel(input: Dataset[ResultData]) = {
+
+  // Produce data for training
+  def prepareTrainingData(input: Dataset[ResultData]) = {
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
     // The records can be annoying-ish to compute
     labeledRecords.cache()
     labeledRecords.count()
+    // Extract the extension and cast the label
     val extractExtensionUDF = udf(TrainingPipeline.extractExtension _)
-    val recordsWithExtension = labeledRecords.withColumn(
+    labeledRecords.withColumn(
       "extension", extractExtensionUDF(labeledRecords("filename")))
       .withColumn(
-        "label", col("commented").cast("double"))
+        "label", labeledRecords("commented").cast("double"))
+  }
+
+  def trainModel(input: Dataset[ResultData]) = {
+    val preparedTrainingData = prepareTrainingData(input)
     val pipeline = new Pipeline()
     // Turn our different file names into string indexes
     val extensionIndexer = new StringIndexer()
@@ -59,7 +68,7 @@ class TrainingPipeline(sc: SparkContext) {
       word2vec,
       featureVec,
       forest).toArray)
-    pipeline.fit(recordsWithExtension)
+    pipeline.fit(preparedTrainingData)
   }
 }
 
@@ -74,22 +83,34 @@ object TrainingPipeline {
   // TODO: tests explicitly and seperately from rest of pipeline
   // Take an indivudal PR and produce a sequence of labeled records
   def produceRecord(input: ResultData): Seq[LabeledRecord] = {
-    val commentsOnCommitIdsWithLineWithFile = input.comment_commit_ids
-      .zip(input.comments_positions)
-      .zip(input.comment_file_paths)
+    val commentsOnCommitIdsWithNewLineWithFile = ImmutableHashSet(
+      input.comment_commit_ids
+        .flatZip(input.comments_positions).flatZip(input.comment_file_paths):_*)
+    val commentsOnCommitIdsWithOldLineWithFile = ImmutableHashSet(
+      input.comment_commit_ids
+        .flatZip(input.comments_original).flatZip(input.comment_file_paths):_*)
+    def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
+      commentsOnCommitIdsWithNewLineWithFile(
+        (patchRecord.commitId, Some(patchRecord.newPos), patchRecord.filename)) ||
+      commentsOnCommitIdsWithOldLineWithFile(
+        (patchRecord.commitId, Some(patchRecord.oldPos), patchRecord.filename))
+    }
     val patchLines = PatchExtractor.processPatch(input.patch)
     val initialRecords = patchLines.map(patchRecord =>
       LabeledRecord(patchRecord.text, patchRecord.filename, patchRecord.add,
-        commentsOnCommitIdsWithLineWithFile.contains(
-          (patchRecord.commitId, Some(patchRecord.newNumber), patchRecord.filename)
-        ))).distinct
+        recordHasBeenCommentedOn(patchRecord))).distinct
     //The same line may show up in multiple patches, if it's commented on in any of them
     // we want to record it as commented
     val commentedRecords = initialRecords.filter(_.commented)
-    val seenTextAndFile = new HashSet[(String, String)]
-    val uncommentedRecords = initialRecords.filter(r => !r.commented)
-    val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
-      record => seenTextAndFile.add((record.text, record.filename))}
-    resultRecords
+    // Only output PRs which have a comment that we can resolve
+    if (commentedRecords.isEmpty) {
+      commentedRecords
+    } else {
+      val seenTextAndFile = new HashSet[(String, String)]
+      val uncommentedRecords = initialRecords.filter(r => !r.commented)
+      val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
+        record => seenTextAndFile.add((record.text, record.filename))}
+      resultRecords
+    }
   }
 }

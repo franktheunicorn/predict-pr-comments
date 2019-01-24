@@ -24,6 +24,7 @@ lazy val root = (project in file(".")).
       "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
+      "com.github.marklister" %% "product-collections" % "1.4.5",
 
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
