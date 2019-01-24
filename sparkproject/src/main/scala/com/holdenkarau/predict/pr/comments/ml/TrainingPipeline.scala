@@ -134,7 +134,7 @@ class TrainingPipeline(sc: SparkContext) {
     // Try and find some reasonable params
     val paramGrid = new ParamGridBuilder()
       .addGrid(tokenizer.minTokenLength, Array(1, 3))
-      .addGrid(classifier.numTrees, Array(1, 10, 20, 40))
+      .addGrid(classifier.numTrees, Array(1, 20))
       .addGrid(featureVec.inputCols, Array(
         Array("wordvecs", "extension_index"), // Word2Vec for feature perp
         Array("tfIdf", "extension_index") // tf-idf for feature prep
