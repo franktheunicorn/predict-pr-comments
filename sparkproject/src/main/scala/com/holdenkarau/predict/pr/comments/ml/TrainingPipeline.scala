@@ -120,8 +120,8 @@ class TrainingPipeline(sc: SparkContext) {
     val classifier = forest match {
       case true =>
         new RandomForestClassifier()
-          .setFeaturesCol("features").setLabelCol("label")
-      case false => new org.apache.spark.ml.classification.DecisionTreeClassifier()
+          .setFeaturesCol("features").setLabelCol("label").setMaxBins(500)
+      case false => new org.apache.spark.ml.classification.DecisionTreeClassifier().setMaxBins(500)
 
     }
     pipeline.setStages(List(
