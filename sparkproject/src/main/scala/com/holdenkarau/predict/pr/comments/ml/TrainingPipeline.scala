@@ -36,8 +36,11 @@ class TrainingPipeline(sc: SparkContext) {
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
 
     val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
-    val (model, effectiveness) = trainAndEvalModel(inputData)
+    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(inputData)
     model.write.overwrite().save(s"$output/model")
+    val summary =
+      s"Train/model effectiveness was $effectiveness and scores ${model.avgMetrics}" +
+      s" for ${model.estimatorParamMaps} with $positives out of $datasetSize"
     sc.parallelize(List(effectiveness), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -58,11 +61,12 @@ class TrainingPipeline(sc: SparkContext) {
 
   def balanceClasses(input: Dataset[PreparedData]) = {
     input.cache()
+    // Double so we can get fractional results
     val (datasetSize, positives) = input.select(
       count("*"), sum(input("label"))).as[(Long, Double)].collect.head
     val balancingRatio = positives match {
-      case 0 => throw new Exception("No positive examples found, refusing to balance")
-      case _ => datasetSize / positives
+      case 0.0 => throw new Exception("No positive examples found, refusing to balance")
+      case _ => (datasetSize / positives).ceil
     }
     // Some of the algs support weightCol some don't so just duplicate records
     val result = input.flatMap{record =>
@@ -82,6 +86,10 @@ class TrainingPipeline(sc: SparkContext) {
     split: List[Double] = List(0.9, 0.1)) = {
 
     input.cache()
+    val preparedInput = prepareTrainingData(input)
+    val (datasetSize, positives) = preparedInput.select(
+      count("*"), sum(input("label"))).as[(Long, Long)].collect.head
+
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
@@ -94,7 +102,7 @@ class TrainingPipeline(sc: SparkContext) {
     testResult.show()
     val score = evaluator.evaluate(testResult)
     println(s"Model score: $score")
-    (model, score)
+    (model, score, datasetSize, positives)
   }
 
   def trainModel(input: Dataset[ResultData]) = {
@@ -133,7 +141,6 @@ class TrainingPipeline(sc: SparkContext) {
       classifier).toArray)
     // Try and find some reasonable params
     val paramGrid = new ParamGridBuilder()
-      .addGrid(tokenizer.minTokenLength, Array(1, 3))
       .addGrid(classifier.numTrees, Array(1, 20))
       .addGrid(featureVec.inputCols, Array(
         Array("wordvecs", "extension_index"), // Word2Vec for feature perp

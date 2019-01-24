@@ -33,8 +33,9 @@ class BasicE2EModelTest extends FunSuite with SharedSparkContext {
       sc.parallelize(List(E2EModelSampleRecord.record))).as[ResultData]
     // Make copies of the data so we can have a test set
     // Note: means our results are kind of BS but it's just for testing
-    val synth = input.flatMap(x => List.fill(20)(x))
+    val synth = input.flatMap(x => List.fill(5)(x))
     val trainer = new TrainingPipeline(sc)
-    val (pipelineModel, score) = trainer.trainAndEvalModel(synth, split=List(0.9, 0.1))
+    val (pipelineModel, score, datasetSize, positives) = trainer.trainAndEvalModel(synth, split=List(0.5, 0.5))
+    datasetSize should be > (positives)
   }
 }
