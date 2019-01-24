@@ -13,7 +13,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-import org.apache.spark.ml.feature.{Word2Vec, RegexTokenizer, StringIndexer, SQLTransformer, VectorAssembler}
+import org.apache.spark.ml.feature._
 import org.apache.spark.ml.classification.RandomForestClassifier
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
@@ -79,13 +79,13 @@ class TrainingPipeline(sc: SparkContext) {
   }
 
   def trainAndEvalModel(input: Dataset[ResultData],
-    split: List[Double] = List(0.9, 0.1), forest: Boolean = true) = {
+    split: List[Double] = List(0.9, 0.1)) = {
 
     input.cache()
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
-    val model = trainModel(train, forest)
+    val model = trainModel(train)
     val testResult = model.transform(prepareTrainingData(test))
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
@@ -97,7 +97,7 @@ class TrainingPipeline(sc: SparkContext) {
     (model, score)
   }
 
-  def trainModel(input: Dataset[ResultData], forest: Boolean = true) = {
+  def trainModel(input: Dataset[ResultData]) = {
     val preparedTrainingData = prepareTrainingData(input)
     // Balanace the training data
     val balancedTrainingData = balanceClasses(preparedTrainingData)
@@ -113,26 +113,46 @@ class TrainingPipeline(sc: SparkContext) {
     val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
     // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
     val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
+    // Or let's see about tfidf
+    val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
+    val idf = new IDF().setInputCol("rawTf").setOutputCol("tfIdf")
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler().setInputCols(
       List("wordvecs", "extension_index").toArray).setOutputCol("features")
     // Create our simple random forest
-    val classifier = forest match {
-      case true =>
-        new RandomForestClassifier()
-          .setFeaturesCol("features").setLabelCol("label").setMaxBins(500)
-      case false => new org.apache.spark.ml.classification.DecisionTreeClassifier().setMaxBins(500)
-
-    }
+    val classifier = new RandomForestClassifier()
+      .setFeaturesCol("features").setLabelCol("label").setMaxBins(200)
     pipeline.setStages(List(
       extensionIndexer,
       tokenizer,
       word2vec,
+      hashingTf,
+      idf,
       // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
       featureVec,
       classifier).toArray)
-    val model = pipeline.fit(balancedTrainingData)
-    model
+    // Try and find some reasonable params
+    val paramGrid = new ParamGridBuilder()
+      .addGrid(tokenizer.minTokenLength, Array(1, 3))
+      .addGrid(classifier.numTrees, Array(1, 10, 20, 40))
+      .addGrid(featureVec.inputCols, Array(
+        Array("wordvecs", "extension_index"), // Word2Vec for feature perp
+        Array("tfIdf", "extension_index") // tf-idf for feature prep
+      )).build()
+
+    val evaluator = new BinaryClassificationEvaluator()
+    // We have a pretty imbalanced class distribution
+      .setMetricName("areaUnderPR")
+      .setLabelCol("label")
+
+    val cv = new CrossValidator()
+      .setEstimator(pipeline)
+      .setEvaluator(evaluator)
+      .setEstimatorParamMaps(paramGrid)
+      .setNumFolds(3)
+      .setParallelism(3)
+      .setCollectSubModels(true)
+    cv.fit(balancedTrainingData)
   }
 }
 
