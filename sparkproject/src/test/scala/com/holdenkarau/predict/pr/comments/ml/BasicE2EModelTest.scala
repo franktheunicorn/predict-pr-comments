@@ -24,4 +24,17 @@ class BasicE2EModelTest extends FunSuite with SharedSparkContext {
     val transformedResult = pipelineModel.transform(
       trainer.prepareTrainingData(input))
   }
+
+  test("tiny train and fit smoke test") {
+    val session = SparkSession.builder().getOrCreate()
+    import session.implicits._
+    val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
+    val input = session.read.schema(schema).format("json").json(
+      sc.parallelize(List(E2EModelSampleRecord.record))).as[ResultData]
+    // Make copies of the data so we can have a test set
+    // Note: means our results are kind of BS but it's just for testing
+    val synth = input.flatMap(x => List.fill(20)(x))
+    val trainer = new TrainingPipeline(sc)
+    val (pipelineModel, score) = trainer.trainAndEvalModel(synth, split=List(0.9, 0.1))
+  }
 }

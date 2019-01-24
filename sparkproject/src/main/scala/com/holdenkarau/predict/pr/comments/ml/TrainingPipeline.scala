@@ -58,21 +58,36 @@ class TrainingPipeline(sc: SparkContext) {
       case _ => datasetSize / positives
     }
     // Some of the algs support weightCol some don't so just duplicate records
-    input.flatMap{record =>
+    val result = input.flatMap{record =>
       if (record.label != 0.0) {
         List.fill(balancingRatio.toInt)(record)
       } else {
         Some(record)
       }
     }
+    result.cache()
+    result.count()
+    input.unpersist()
+    result
   }
 
-  def trainAndEvalModel(input: Dataset[ResultData]) = {
+  def trainAndEvalModel(input: Dataset[ResultData],
+    split: List[Double] = List(0.9, 0.1)) = {
+
+    input.cache()
+    val splits = input.randomSplit(split.toArray, seed=42)
+    val train = splits(0)
+    val test = splits(1)
+    val model = trainModel(train)
+    val testResult = model.transform(prepareTrainingData(test))
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
       .setMetricName("areaUnderPR")
       .setLabelCol("label")
-
+    testResult.show()
+    val score = evaluator.evaluate(testResult)
+    println(s"Model score: $score")
+    (model, score)
   }
 
   def trainModel(input: Dataset[ResultData]) = {
@@ -105,8 +120,6 @@ class TrainingPipeline(sc: SparkContext) {
       featureVec,
       forest).toArray)
     val model = pipeline.fit(balancedTrainingData)
-    val results = model.transform(preparedTrainingData)
-    results.show()
     model
   }
 }
