@@ -7,6 +7,7 @@ import com.github.marklister.collections._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
@@ -32,6 +33,12 @@ class TrainingPipeline(sc: SparkContext) {
 
   def trainAndSaveModel(input: String, output: String) = {
     // TODO: Do this
+    val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
+
+    val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
+    val (model, effectiveness) = trainAndEvalModel(inputData)
+    model.write.overwrite().save(s"$output/model")
+    sc.parallelize(List(effectiveness), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
 
@@ -72,13 +79,13 @@ class TrainingPipeline(sc: SparkContext) {
   }
 
   def trainAndEvalModel(input: Dataset[ResultData],
-    split: List[Double] = List(0.9, 0.1)) = {
+    split: List[Double] = List(0.9, 0.1), forest: Boolean = true) = {
 
     input.cache()
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
-    val model = trainModel(train)
+    val model = trainModel(train, forest)
     val testResult = model.transform(prepareTrainingData(test))
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
@@ -90,7 +97,7 @@ class TrainingPipeline(sc: SparkContext) {
     (model, score)
   }
 
-  def trainModel(input: Dataset[ResultData]) = {
+  def trainModel(input: Dataset[ResultData], forest: Boolean = true) = {
     val preparedTrainingData = prepareTrainingData(input)
     // Balanace the training data
     val balancedTrainingData = balanceClasses(preparedTrainingData)
@@ -110,15 +117,20 @@ class TrainingPipeline(sc: SparkContext) {
     val featureVec = new VectorAssembler().setInputCols(
       List("wordvecs", "extension_index").toArray).setOutputCol("features")
     // Create our simple random forest
-    val forest = new RandomForestClassifier()
-      .setFeaturesCol("features").setLabelCol("label")
+    val classifier = forest match {
+      case true =>
+        new RandomForestClassifier()
+          .setFeaturesCol("features").setLabelCol("label")
+      case false => new org.apache.spark.ml.classification.DecisionTreeClassifier()
+
+    }
     pipeline.setStages(List(
       extensionIndexer,
       tokenizer,
       word2vec,
       // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
       featureVec,
-      forest).toArray)
+      classifier).toArray)
     val model = pipeline.fit(balancedTrainingData)
     model
   }
