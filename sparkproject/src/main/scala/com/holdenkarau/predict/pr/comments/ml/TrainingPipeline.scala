@@ -102,10 +102,15 @@ object TrainingPipeline {
     //The same line may show up in multiple patches, if it's commented on in any of them
     // we want to record it as commented
     val commentedRecords = initialRecords.filter(_.commented)
-    val seenTextAndFile = new HashSet[(String, String)]
-    val uncommentedRecords = initialRecords.filter(r => !r.commented)
-    val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
-      record => seenTextAndFile.add((record.text, record.filename))}
-    resultRecords
+    // Only output PRs which have a comment that we can resolve
+    if (commentedRecords.isEmpty) {
+      commentedRecords
+    } else {
+      val seenTextAndFile = new HashSet[(String, String)]
+      val uncommentedRecords = initialRecords.filter(r => !r.commented)
+      val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
+        record => seenTextAndFile.add((record.text, record.filename))}
+      resultRecords
+    }
   }
 }
