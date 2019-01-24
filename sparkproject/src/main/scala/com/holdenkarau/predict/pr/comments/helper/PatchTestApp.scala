@@ -14,7 +14,7 @@ object PatchTestAppSC extends App {
   // Use default parallelism for the input because the other values
   // do it based on the input layout and our input is not well partitioned.
   val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
-  val input = session.read.format("parquet").load(inputFile).repartition(inputParallelism)
+  val input = session.read.format("parquet").option("mergeSchema", "true").load(inputFile).repartition(inputParallelism)
   input.cache()
   input.count()
   val rejected = input.select("patch").as[String].flatMap {patch => 
