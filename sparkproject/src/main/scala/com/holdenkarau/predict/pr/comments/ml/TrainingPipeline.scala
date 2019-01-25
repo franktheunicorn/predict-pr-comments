@@ -88,7 +88,9 @@ class TrainingPipeline(sc: SparkContext) {
     input.cache()
     val preparedInput = prepareTrainingData(input)
     val (datasetSize, positives) = preparedInput.select(
-      count("*"), sum(input("label"))).as[(Long, Long)].collect.head
+      count("*"), sum(preparedInput("label").cast("long")))
+      .as[(Long, Long)]
+      .collect.head
 
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
