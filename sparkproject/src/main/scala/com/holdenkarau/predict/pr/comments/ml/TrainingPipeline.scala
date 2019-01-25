@@ -176,7 +176,7 @@ object TrainingPipeline {
   val extensionRegex = """.+[a-zA-Z0-9]+\.([a-zA-Z\+]*?)$""".r
 
   def extractExtension(filename: String): Option[String] = {
-    filename.toLower match {
+    filename.toLowerCase match {
       case extensionRegex(ext) if ext.length < 6 &&  => Some(ext)
       case _ => None
     }
