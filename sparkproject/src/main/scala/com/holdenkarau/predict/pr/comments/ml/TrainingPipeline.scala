@@ -132,24 +132,24 @@ class TrainingPipeline(sc: SparkContext) {
       List("wordvecs", "extension_index").toArray).setOutputCol("features")
     // Create our simple random forest
     val classifier = new RandomForestClassifier()
-      .setFeaturesCol("features").setLabelCol("label").setMaxBins(200)
+      .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
     pipeline.setStages(List(
       extensionIndexer,
       tokenizer,
       word2vec,
-      hashingTf,
-      idf,
+      //hashingTf,
+      //idf,
       // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
       featureVec,
       classifier).toArray)
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
-      paramGridBuilder.addGrid(classifier.numTrees, Array(1, 20))
-        .addGrid(featureVec.inputCols, Array(
+      paramGridBuilder.addGrid(classifier.numTrees, Array(1, 10))
+        /*.addGrid(featureVec.inputCols, Array(
           Array("wordvecs", "extension_index"), // Word2Vec for feature perp
           Array("tfIdf", "extension_index") // tf-idf for feature prep
-        ))
+        ))*/
     }
     val paramGrid = paramGridBuilder.build()
 
@@ -170,10 +170,11 @@ class TrainingPipeline(sc: SparkContext) {
 }
 
 object TrainingPipeline {
-  val extensionRegex = """.+\.(.*?)$""".r
+  val extensionRegex = """.+[a-zA-Z0-9]+\.([a-zA-Z\+]*?)$""".r
+
   def extractExtension(filename: String): Option[String] = {
-    filename match {
-      case extensionRegex(ext) => Some(ext)
+    filename.toLower match {
+      case extensionRegex(ext) if ext.length < 6 &&  => Some(ext)
       case _ => None
     }
   }
