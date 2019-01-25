@@ -40,7 +40,7 @@ class TrainingPipeline(sc: SparkContext) {
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
 
     val partitionedInputs = inputData.repartition(inputParallelism)
-    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(inputData)
+    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs)
     model.write.overwrite().save(s"$output/model")
     val summary =
       s"Train/model effectiveness was $effectiveness and scores ${model.avgMetrics}" +
@@ -52,9 +52,6 @@ class TrainingPipeline(sc: SparkContext) {
   // Produce data for training
   def prepareTrainingData(input: Dataset[ResultData]) = {
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
-    // The records can be annoying-ish to compute
-    labeledRecords.cache()
-    labeledRecords.count()
     // Extract the extension and cast the label
     val extractExtensionUDF = udf(TrainingPipeline.extractExtension _)
     labeledRecords.withColumn(
