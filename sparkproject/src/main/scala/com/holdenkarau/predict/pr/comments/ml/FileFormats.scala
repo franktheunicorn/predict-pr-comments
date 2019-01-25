@@ -3,7 +3,7 @@ import scala.collection.immutable.{HashSet => ImmutableHashSet}
 
 object FileFormats {
   // Loosely from https://en.wikipedia.org/wiki/List_of_file_formats#Programming_languages_and_scripts
-  val formats = ImmutableHashSetList(
+  val formats = ImmutableHashSet(List(
     "md",
     "scala",
     "go",
@@ -45,5 +45,5 @@ object FileFormats {
     "RB",
     "RUBY",
     "TCL",
-    "VBS").map(_.toLower))
+    "VBS").map(_.toLowerCase))
 }
