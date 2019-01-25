@@ -14,9 +14,10 @@ export MEMORY_OVERHEAD_FRACT=${MEMORY_OVERHEAD_FRACK:="0.3"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
 export APP_NAME=${APP_NAME:="spark-data-fetcher"}
 export MAIN_CLASS=${MAIN_CLASS:="com.holdenkarau.predict.pr.comments.sparkProject.DataFetchSCApp"}
-export SPARK_HOME=${SPARK_HOME:="~/Downloads/spark-2.4.0-bin-hadoop2.7/"}
+export SPARK_HOME=${SPARK_HOME:="$HOME/Downloads/spark-2.4.0-bin-hadoop2.7/"}
 export RUNDATE=$(date +"%T")
-export APP_NAME="$APP_NAME-$RUNDATE"
+export COMMIT_PREFIX=$(git rev-parse HEAD | cut -c 1-8)
+export APP_NAME="$APP_NAME-$RUNDATE-$COMMIT_PREFIX"
 pushd $SPARK_HOME
 ./bin/spark-submit --master k8s://http://127.0.0.1:8001  \
   --deploy-mode cluster --conf \

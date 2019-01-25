@@ -36,6 +36,10 @@ class TrainingPipeline(sc: SparkContext) {
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
 
     val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
+    // Reparition the inputs
+    val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
+
+    val partitionedInputs = inputData.repartition(inputParallelism)
     val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(inputData)
     model.write.overwrite().save(s"$output/model")
     val summary =
