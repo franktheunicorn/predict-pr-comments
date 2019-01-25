@@ -83,7 +83,7 @@ class TrainingPipeline(sc: SparkContext) {
   }
 
   def trainAndEvalModel(input: Dataset[ResultData],
-    split: List[Double] = List(0.9, 0.1)) = {
+    split: List[Double] = List(0.9, 0.1), fast: Boolean = false) = {
 
     input.cache()
     val preparedInput = prepareTrainingData(input)
@@ -93,7 +93,7 @@ class TrainingPipeline(sc: SparkContext) {
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
-    val model = trainModel(train)
+    val model = trainModel(train, fast)
     val testResult = model.transform(prepareTrainingData(test))
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
@@ -105,7 +105,7 @@ class TrainingPipeline(sc: SparkContext) {
     (model, score, datasetSize, positives)
   }
 
-  def trainModel(input: Dataset[ResultData]) = {
+  def trainModel(input: Dataset[ResultData], fast: Boolean=false) = {
     val preparedTrainingData = prepareTrainingData(input)
     // Balanace the training data
     val balancedTrainingData = balanceClasses(preparedTrainingData)
@@ -140,12 +140,15 @@ class TrainingPipeline(sc: SparkContext) {
       featureVec,
       classifier).toArray)
     // Try and find some reasonable params
-    val paramGrid = new ParamGridBuilder()
-      .addGrid(classifier.numTrees, Array(1, 20))
-      .addGrid(featureVec.inputCols, Array(
-        Array("wordvecs", "extension_index"), // Word2Vec for feature perp
-        Array("tfIdf", "extension_index") // tf-idf for feature prep
-      )).build()
+    val paramGridBuilder = new ParamGridBuilder()
+    if (!fast) {
+      paramGridBuilder.addGrid(classifier.numTrees, Array(1, 20))
+        .addGrid(featureVec.inputCols, Array(
+          Array("wordvecs", "extension_index"), // Word2Vec for feature perp
+          Array("tfIdf", "extension_index") // tf-idf for feature prep
+        ))
+    }
+    val paramGrid = paramGridBuilder.build()
 
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
