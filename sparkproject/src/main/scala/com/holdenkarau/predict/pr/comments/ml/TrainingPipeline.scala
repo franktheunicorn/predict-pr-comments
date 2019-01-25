@@ -24,7 +24,7 @@ import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean)
 // LabeledRecord + extension and label and line length as a double for vector assembler
 case class PreparedData(text: String, filename: String, add: Boolean, commented: Boolean,
-  extension: String, lineLength: Double, label: Double)
+  extension: String, line_length: Double, label: Double)
 
 
 class TrainingPipeline(sc: SparkContext) {
