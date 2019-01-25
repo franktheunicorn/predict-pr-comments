@@ -22,9 +22,9 @@ import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, Pa
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
 case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean)
-// LabeledRecord + extension and label
+// LabeledRecord + extension and label and line length as a double for vector assembler
 case class PreparedData(text: String, filename: String, add: Boolean, commented: Boolean,
-  extension: String, label: Double)
+  extension: String, lineLength: Double, label: Double)
 
 
 class TrainingPipeline(sc: SparkContext) {
@@ -57,7 +57,10 @@ class TrainingPipeline(sc: SparkContext) {
     labeledRecords.withColumn(
       "extension", extractExtensionUDF(labeledRecords("filename")))
       .withColumn(
-        "label", labeledRecords("commented").cast("double")).as[PreparedData]
+        "label", labeledRecords("commented").cast("double"))
+      .withColumn(
+        "line_length", length(labeledRecords("text")).cast("double"))
+      .as[PreparedData]
   }
 
   def balanceClasses(input: Dataset[PreparedData]) = {
@@ -129,7 +132,7 @@ class TrainingPipeline(sc: SparkContext) {
     val idf = new IDF().setInputCol("rawTf").setOutputCol("tfIdf")
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler().setInputCols(
-      List("wordvecs", "extension_index").toArray).setOutputCol("features")
+      List("wordvecs", "extension_index", "line_length").toArray).setOutputCol("features")
     // Create our simple random forest
     val classifier = new RandomForestClassifier()
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
