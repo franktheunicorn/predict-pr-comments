@@ -45,5 +45,5 @@ object FileFormats {
     "RB",
     "RUBY",
     "TCL",
-    "VBS").map(_.toLowerCase))
+    "VBS").map(_.toLowerCase):_*)
 }

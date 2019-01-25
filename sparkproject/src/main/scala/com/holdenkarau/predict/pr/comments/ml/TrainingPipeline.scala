@@ -177,7 +177,7 @@ object TrainingPipeline {
 
   def extractExtension(filename: String): Option[String] = {
     filename.toLowerCase match {
-      case extensionRegex(ext) if ext.length < 6 &&  => Some(ext)
+      case extensionRegex(ext) if FileFormats.formats.contains(ext)  => Some(ext)
       case _ => None
     }
   }
