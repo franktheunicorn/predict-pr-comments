@@ -45,7 +45,7 @@ class TrainingPipeline(sc: SparkContext) {
     val summary =
       s"Train/model effectiveness was $effectiveness and scores ${model.avgMetrics}" +
       s" for ${model.estimatorParamMaps} with $positives out of $datasetSize"
-    sc.parallelize(List(effectiveness), 1).saveAsTextFile(s"$output/effectiveness")
+    sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
 
