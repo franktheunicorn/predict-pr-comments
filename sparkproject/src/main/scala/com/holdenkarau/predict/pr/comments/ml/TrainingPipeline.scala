@@ -129,13 +129,23 @@ class TrainingPipeline(sc: SparkContext) {
     val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
     // Or let's see about tfidf
     val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
-    val idf = new IDF().setInputCol("rawTf").setOutputCol("tfIdf")
+    val idf = new IDF().setInputCol("rawTf").setOutputCol("tf_idf")
     // Create our charlie brown christmasstree esque feature vector
-    val featureVec = new VectorAssembler().setInputCols(
-      List("wordvecs", "tfIdf", "extension_index", "line_length").toArray).setOutputCol("features")
+    val featureVec = new VectorAssembler()
+      .setInputCols(Array(
+        "wordvecs",
+        //"tf_idf",
+        "extension_index",
+        "line_length"))
+      .setOutputCol("features")
     // Create our simple random forest
     val classifier = new LogisticRegression()
       .setFeaturesCol("features").setLabelCol("label")
+    if (fast) {
+      classifier.setMaxIter(5)
+    } else {
+      classifier.setMaxIter(200)
+    }
     pipeline.setStages(List(
       extensionIndexer,
       tokenizer,
@@ -148,7 +158,7 @@ class TrainingPipeline(sc: SparkContext) {
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
-      paramGridBuilder.addGrid(classifier.regParam, Array(0.0, 0.5, 1.0))
+      paramGridBuilder.addGrid(classifier.elasticNetParam, Array(0.0, 0.2, 0.5))
     }
     val paramGrid = paramGridBuilder.build()
 

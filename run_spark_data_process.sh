@@ -9,7 +9,7 @@ export OUTPUT=${OUTPUT:="gs://frank-the-unicorn/dev/output"}
 export CACHE=${CACHE:="gs://frank-the-unicorn/dev/cache"}
 export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
-export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="21g"}
+export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="19g"}
 export MEMORY_OVERHEAD_FRACT=${MEMORY_OVERHEAD_FRACK:="0.3"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
 export APP_NAME=${APP_NAME:="spark-data-fetcher"}
