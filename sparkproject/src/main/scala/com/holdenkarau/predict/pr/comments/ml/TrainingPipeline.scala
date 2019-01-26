@@ -14,7 +14,7 @@ import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature._
-import org.apache.spark.ml.classification.RandomForestClassifier
+import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
@@ -132,10 +132,10 @@ class TrainingPipeline(sc: SparkContext) {
     val idf = new IDF().setInputCol("rawTf").setOutputCol("tfIdf")
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler().setInputCols(
-      List("wordvecs", "extension_index", "line_length").toArray).setOutputCol("features")
+      List("wordvecs", "tfIdf", "extension_index", "line_length").toArray).setOutputCol("features")
     // Create our simple random forest
-    val classifier = new RandomForestClassifier()
-      .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
+    val classifier = new LogisticRegression()
+      .setFeaturesCol("features").setLabelCol("label")
     pipeline.setStages(List(
       extensionIndexer,
       tokenizer,
@@ -148,11 +148,7 @@ class TrainingPipeline(sc: SparkContext) {
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
-      paramGridBuilder.addGrid(classifier.numTrees, Array(1, 10))
-        /*.addGrid(featureVec.inputCols, Array(
-          Array("wordvecs", "extension_index"), // Word2Vec for feature perp
-          Array("tfIdf", "extension_index") // tf-idf for feature prep
-        ))*/
+      paramGridBuilder.addGrid(classifier.regParam, Array(0.0, 0.5, 1.0))
     }
     val paramGrid = paramGridBuilder.build()
 
