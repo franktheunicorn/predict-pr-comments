@@ -11,7 +11,7 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
+import org.apache.spark.ml.tuning.{CrossValidator, CrossValidatorModel, ParamGridBuilder}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature._
 import org.apache.spark.ml.classification.LogisticRegression
@@ -42,9 +42,10 @@ class TrainingPipeline(sc: SparkContext) {
     val partitionedInputs = inputData.repartition(inputParallelism)
     val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs)
     model.write.overwrite().save(s"$output/model")
+    val cvStage = model.stages.last.asInstanceOf[CrossValidatorModel]
     val summary =
-      s"Train/model effectiveness was $effectiveness and scores ${model.avgMetrics}" +
-      s" for ${model.estimatorParamMaps} with $positives out of $datasetSize"
+      s"Train/model effectiveness was $effectiveness and scores ${cvStage.avgMetrics}" +
+      s" for ${cvStage.estimatorParamMaps} with $positives out of $datasetSize"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -116,7 +117,7 @@ class TrainingPipeline(sc: SparkContext) {
     // Balanace the training data
     val balancedTrainingData = balanceClasses(preparedTrainingData)
 
-    val pipeline = new Pipeline()
+    val prepPipeline = new Pipeline()
     // Turn our different file names into string indexes
     val extensionIndexer = new StringIndexer()
       .setHandleInvalid("keep") // Some files no extensions
@@ -127,9 +128,6 @@ class TrainingPipeline(sc: SparkContext) {
     val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
     // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
     val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
-    // Or let's see about tfidf
-    val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
-    val idf = new IDF().setInputCol("rawTf").setOutputCol("tf_idf")
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler()
       .setInputCols(Array(
@@ -138,7 +136,21 @@ class TrainingPipeline(sc: SparkContext) {
         "extension_index",
         "line_length"))
       .setOutputCol("features")
-    // Create our simple random forest
+
+    // Do our feature prep seperately from CV search because word2vec is expensive
+    prepPipeline.setStages(Array(
+      extensionIndexer,
+      tokenizer,
+      word2vec,
+      //hashingTf,
+      //idf,
+      // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
+      featureVec))
+    val prepModel = prepPipeline.fit(balancedTrainingData)
+    val preppedData = prepModel.transform(balancedTrainingData)
+    preppedData.cache().count()
+    
+    // Create our simple classifier
     val classifier = new LogisticRegression()
       .setFeaturesCol("features").setLabelCol("label")
     if (fast) {
@@ -146,18 +158,10 @@ class TrainingPipeline(sc: SparkContext) {
     } else {
       classifier.setMaxIter(200)
     }
-    pipeline.setStages(List(
-      extensionIndexer,
-      tokenizer,
-      word2vec,
-      //hashingTf,
-      //idf,
-      // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
-      featureVec,
-      classifier).toArray)
+
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
-    if (!fast) {
+    if (!fast && false) {
       paramGridBuilder.addGrid(classifier.elasticNetParam, Array(0.0, 0.2, 0.5))
     }
     val paramGrid = paramGridBuilder.build()
@@ -168,13 +172,17 @@ class TrainingPipeline(sc: SparkContext) {
       .setLabelCol("label")
 
     val cv = new CrossValidator()
-      .setEstimator(pipeline)
+      .setEstimator(classifier)
       .setEvaluator(evaluator)
       .setEstimatorParamMaps(paramGrid)
       .setNumFolds(3)
       .setParallelism(3)
       .setCollectSubModels(true)
-    cv.fit(balancedTrainingData)
+    val cvModels = cv.fit(preppedData)
+    val resultPipeline = new Pipeline().setStages(
+      Array(prepModel, cvModels))
+    // This should just copy the models over
+    resultPipeline.fit(balancedTrainingData)
   }
 }
 
