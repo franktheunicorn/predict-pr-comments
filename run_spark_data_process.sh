@@ -3,13 +3,14 @@ set -e
 set -x
 export COMMIT=$(git rev-parse HEAD)
 export DOCKER_REPO=${DOCKER_REPO:="gcr.io/boos-demo-projects-are-rad/spark-prod"}
-export SPARK_VERSION=${SPARK_VERSION:="v2.4.0-with-deps"}
+export SPARK_VERSION=${SPARK_VERSION:="v2.4.0-with-deps-and-openblas"}
 export INPUT=${INPUT:="gs://tigeys-buckets-are-rad/20190118.csv"}
 export OUTPUT=${OUTPUT:="gs://frank-the-unicorn/dev/output"}
 export CACHE=${CACHE:="gs://frank-the-unicorn/dev/cache"}
 export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
 export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="19g"}
+export SPARK_DRIVER_MEMORY=${SPARK_EXEC_MEMORY:="40g"}
 export MEMORY_OVERHEAD_FRACT=${MEMORY_OVERHEAD_FRACK:="0.3"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
 export APP_NAME=${APP_NAME:="spark-data-fetcher"}
@@ -24,6 +25,8 @@ pushd $SPARK_HOME
  spark.kubernetes.container.image=$DOCKER_REPO/spark:$SPARK_VERSION \
  --conf spark.executor.instances=$NUM_EXECS \
  --conf spark.executor.memory=$SPARK_EXEC_MEMORY \
+ --conf spark.kryoserializer.buffer.max="6m" \
+ --conf spark.driver.memory=$SPARK_DRIVER_MEMORY \
  --class $MAIN_CLASS \
  --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark3 \
  --conf spark.kubernetes.namespace=spark \
