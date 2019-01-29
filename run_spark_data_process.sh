@@ -11,7 +11,7 @@ export JAR=${JAR:="gs://frank-the-unicorn/jars/$COMMIT.jar"}
 export NUM_EXECS=${NUM_EXECS:="3"}
 export SPARK_EXEC_MEMORY=${SPARK_EXEC_MEMORY:="30g"}
 export SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:="40g"}
-export MEMORY_OVERHEAD_FRACT=${MEMORY_OVERHEAD_FRACK:="0.3"}
+export MEMORY_OVERHEAD_FRACTION=${MEMORY_OVERHEAD_FRACTION:="0.3"}
 export SPARK_DEFAULT_PARALLELISM=${SPARK_DEFAULT_PARALLELISM:="5000"}
 export APP_NAME=${APP_NAME:="spark-data-fetcher"}
 export MAIN_CLASS=${MAIN_CLASS:="com.holdenkarau.predict.pr.comments.sparkProject.DataFetchSCApp"}
@@ -30,10 +30,11 @@ pushd $SPARK_HOME
  --class $MAIN_CLASS \
  --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark3 \
  --conf spark.kubernetes.namespace=spark \
- --conf spark.kubernetes.memoryOverheadFactor=$MEMORY_OVERHEAD_FRACT \
+ --conf spark.kubernetes.memoryOverheadFactor=$MEMORY_OVERHEAD_FRACTION \
  --conf spark.default.parallelism=$SPARK_DEFAULT_PARALLELISM \
  --conf spark.app.name=$APP_NAME \
  --conf spark.rpc.askTimeout=300 \
+ --conf spark.locality.wait=2 \
  $JAR \
  $INPUT $OUTPUT $CACHE
 popd
