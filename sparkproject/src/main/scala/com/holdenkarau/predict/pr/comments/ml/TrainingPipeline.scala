@@ -10,7 +10,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
-import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.ml.tuning.{CrossValidator, CrossValidatorModel, ParamGridBuilder}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature._
@@ -24,14 +24,14 @@ import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean)
 // LabeledRecord + extension and label and line length as a double for vector assembler
 case class PreparedData(text: String, filename: String, add: Boolean, commented: Boolean,
-  extension: String, line_length: Double, label: Double)
+  extension: String, line_length: Double, label: Double, only_spaces: Double)
 
 
 class TrainingPipeline(sc: SparkContext) {
   val session = SparkSession.builder().getOrCreate()
   import session.implicits._
 
-  def trainAndSaveModel(input: String, output: String) = {
+  def trainAndSaveModel(input: String, output: String, dataprepPipelineLocation: String) = {
     // TODO: Do this
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
 
@@ -40,8 +40,8 @@ class TrainingPipeline(sc: SparkContext) {
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
 
     val partitionedInputs = inputData.repartition(inputParallelism)
-    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs)
-    model.write.overwrite().save(s"$output/model")
+    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
+    model.write.save(s"$output/model")
     val cvStage = model.stages.last.asInstanceOf[CrossValidatorModel]
     val summary =
       s"Train/model effectiveness was $effectiveness and scores ${cvStage.avgMetrics}" +
@@ -51,7 +51,7 @@ class TrainingPipeline(sc: SparkContext) {
 
 
   // Produce data for training
-  def prepareTrainingData(input: Dataset[ResultData]) = {
+  def prepareTrainingData(input: Dataset[ResultData]): Dataset[PreparedData] = {
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
     // Extract the extension and cast the label
     val extractExtensionUDF = udf(TrainingPipeline.extractExtension _)
@@ -61,10 +61,12 @@ class TrainingPipeline(sc: SparkContext) {
         "label", labeledRecords("commented").cast("double"))
       .withColumn(
         "line_length", length(labeledRecords("text")).cast("double"))
+      .withColumn(
+        "only_spaces", expr("""text rlike "^\s+$" """).cast("double"))
       .as[PreparedData]
   }
 
-  def balanceClasses(input: Dataset[PreparedData]) = {
+  def balanceClasses(input: Dataset[PreparedData]): Dataset[PreparedData] = {
     input.cache()
     // Double so we can get fractional results
     val (datasetSize, positives) = input.select(
@@ -88,6 +90,7 @@ class TrainingPipeline(sc: SparkContext) {
   }
 
   def trainAndEvalModel(input: Dataset[ResultData],
+    dataprepPipelineLocation: String,
     split: List[Double] = List(0.9, 0.1), fast: Boolean = false) = {
 
     input.cache()
@@ -100,7 +103,7 @@ class TrainingPipeline(sc: SparkContext) {
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
-    val model = trainModel(train, fast)
+    val model = trainModel(train, dataprepPipelineLocation, fast)
     val testResult = model.transform(prepareTrainingData(test))
     val evaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
@@ -112,44 +115,67 @@ class TrainingPipeline(sc: SparkContext) {
     (model, score, datasetSize, positives)
   }
 
-  def trainModel(input: Dataset[ResultData], fast: Boolean=false) = {
+  // This is kind of a hack because word2vec is expensive and we want to expirement
+  // downstream less expensively.
+  def trainAndSaveOrLoadDataPrepModel(input: Dataset[PreparedData],
+    dataprepPipelineLocation: String): PipelineModel = {
+    // Try and load the model
+    def loadModel(path: String): PipelineModel = {
+      PipelineModel.load(path)
+    }
+    // Train a new model and save it if we don't have to go from
+    def trainAndSaveModel(path: String): PipelineModel = {
+      val prepPipeline = new Pipeline()
+      // Turn our different file names into string indexes
+      val extensionIndexer = new StringIndexer()
+        .setHandleInvalid("keep") // Some files no extensions
+        .setInputCol("extension")
+        .setOutputCol("extension_index")
+      // For now we use the default tokenizer
+      // In the future we could be smart based on programming language
+      val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
+      // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
+      val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
+
+
+      // Do our feature prep seperately from CV search because word2vec is expensive
+      prepPipeline.setStages(Array(
+        extensionIndexer,
+        tokenizer,
+        word2vec
+        ))
+      val prepModel = prepPipeline.fit(input)
+      prepModel.write.overwrite().save(dataprepPipelineLocation)
+      prepModel
+    }
+    val model = try {
+      loadModel(dataprepPipelineLocation)
+    } catch {
+      case _: Exception => trainAndSaveModel(dataprepPipelineLocation)
+    }
+    model
+  }
+
+  def trainModel(input: Dataset[ResultData], dataprepPipelineLocation: String,
+    fast: Boolean = false) = {
     val preparedTrainingData = prepareTrainingData(input)
     // Balanace the training data
     val balancedTrainingData = balanceClasses(preparedTrainingData)
 
-    val prepPipeline = new Pipeline()
-    // Turn our different file names into string indexes
-    val extensionIndexer = new StringIndexer()
-      .setHandleInvalid("keep") // Some files no extensions
-      .setInputCol("extension")
-      .setOutputCol("extension_index")
-    // For now we use the default tokenizer
-    // In the future we could be smart based on programming language
-    val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
-    // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
-    val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
+    val prepModel = trainAndSaveOrLoadDataPrepModel(balancedTrainingData,
+      dataprepPipelineLocation)
+    val preppedData = prepModel.transform(balancedTrainingData)
+    preppedData.cache().count()
+    
     // Create our charlie brown christmasstree esque feature vector
     val featureVec = new VectorAssembler()
       .setInputCols(Array(
         "wordvecs",
-        //"tf_idf",
+        "only_spaces",
         "extension_index",
         "line_length"))
       .setOutputCol("features")
 
-    // Do our feature prep seperately from CV search because word2vec is expensive
-    prepPipeline.setStages(Array(
-      extensionIndexer,
-      tokenizer,
-      word2vec,
-      //hashingTf,
-      //idf,
-      // Todo: use the word2vec embeding to look for "typo" words ala https://medium.com/@thomasdecaux/build-a-spell-checker-with-word2vec-data-with-python-5438a9343afd
-      featureVec))
-    val prepModel = prepPipeline.fit(balancedTrainingData)
-    val preppedData = prepModel.transform(balancedTrainingData)
-    preppedData.cache().count()
-    
     // Create our simple classifier
     val classifier = new LogisticRegression()
       .setFeaturesCol("features").setLabelCol("label")
@@ -158,6 +184,9 @@ class TrainingPipeline(sc: SparkContext) {
     } else {
       classifier.setMaxIter(200)
     }
+
+    // Put our Vector assembler and classifier together
+    val estimatorPipeline = new Pipeline().setStages(Array(featureVec, classifier))
 
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
@@ -172,7 +201,7 @@ class TrainingPipeline(sc: SparkContext) {
       .setLabelCol("label")
 
     val cv = new CrossValidator()
-      .setEstimator(classifier)
+      .setEstimator(estimatorPipeline)
       .setEvaluator(evaluator)
       .setEstimatorParamMaps(paramGrid)
       .setNumFolds(3)
