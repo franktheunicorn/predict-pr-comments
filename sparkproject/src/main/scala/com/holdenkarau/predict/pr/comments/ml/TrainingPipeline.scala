@@ -138,13 +138,28 @@ class TrainingPipeline(sc: SparkContext) {
       val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
       // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
       val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
+      val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
+      val idf = new IDF().setInputCol("rawTf").setOutputCol("tf_idf").setMinDocFreq(10)
+      // Create our charlie brown christmasstree esque feature vector
+      val featureVec = new VectorAssembler()
+        .setInputCols(Array(
+          "wordvecs",
+          "only_spaces",
+          "extension_index",
+          "tf_idf",
+          "line_length"))
+        .setOutputCol("features")
+
 
 
       // Do our feature prep seperately from CV search because word2vec is expensive
       prepPipeline.setStages(Array(
         extensionIndexer,
         tokenizer,
-        word2vec
+        word2vec,
+        hashingTf,
+        idf,
+        featureVec
         ))
       val prepModel = prepPipeline.fit(input)
       prepModel.write.overwrite().save(dataprepPipelineLocation)
@@ -169,29 +184,19 @@ class TrainingPipeline(sc: SparkContext) {
     val preppedData = prepModel.transform(balancedTrainingData)
     preppedData.cache().count()
     
-    // Create our charlie brown christmasstree esque feature vector
-    val featureVec = new VectorAssembler()
-      .setInputCols(Array(
-        "wordvecs",
-        "only_spaces",
-        "extension_index",
-        "line_length"))
-      .setOutputCol("features")
 
     // Create our simple classifier
     val classifier = new RandomForestClassifier()
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
-    // Put our Vector assembler and classifier together
-    val estimatorPipeline = new Pipeline().setStages(Array(featureVec, classifier))
-
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast && false) {
       paramGridBuilder.addGrid(
-        classifier.numTrees, Array(1, 10, 20, 50)
+        classifier.numTrees, Array(1, 10, 20)
       ).addGrid(
-        classifier.minInfoGain, Array(0.0, 0.0001))
+        classifier.minInfoGain, Array(0.0, 0.0001)
+      )
     }
     val paramGrid = paramGridBuilder.build()
 
@@ -201,7 +206,7 @@ class TrainingPipeline(sc: SparkContext) {
       .setLabelCol("label")
 
     val cv = new CrossValidator()
-      .setEstimator(estimatorPipeline)
+      .setEstimator(classifier)
       .setEvaluator(evaluator)
       .setEstimatorParamMaps(paramGrid)
       .setNumFolds(3)
