@@ -33,6 +33,7 @@ pushd $SPARK_HOME
  --conf spark.kubernetes.memoryOverheadFactor=$MEMORY_OVERHEAD_FRACT \
  --conf spark.default.parallelism=$SPARK_DEFAULT_PARALLELISM \
  --conf spark.app.name=$APP_NAME \
+ --conf spark.rpc.askTimeout=300 \
  $JAR \
  $INPUT $OUTPUT $CACHE
 popd

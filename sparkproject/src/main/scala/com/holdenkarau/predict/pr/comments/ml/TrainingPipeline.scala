@@ -40,14 +40,14 @@ class TrainingPipeline(sc: SparkContext) {
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
 
     val partitionedInputs = inputData.repartition(inputParallelism)
-    val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
+    val (model, prScore, rocScore, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
     model.write.save(s"$output/model")
     val cvStage = model.stages.last.asInstanceOf[CrossValidatorModel]
     val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
     val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
     val summary =
-      s"Train/model effectiveness was $effectiveness and scores ${avgMetrics}" +
-      s" for ${paramMaps} with $positives out of $datasetSize"
+      s"Train/model effectiveness was pr: $prScore roc: $rocScore and CV pr scores: " +
+      s"${avgMetrics} for ${paramMaps} with $positives out of $datasetSize"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -87,7 +87,7 @@ class TrainingPipeline(sc: SparkContext) {
     }
     result.cache()
     result.count()
-    input.unpersist()
+    input.unpersist(blocking=false)
     result
   }
 
@@ -107,14 +107,26 @@ class TrainingPipeline(sc: SparkContext) {
     val test = splits(1)
     val model = trainModel(train, dataprepPipelineLocation, fast)
     val testResult = model.transform(prepareTrainingData(test))
-    val evaluator = new BinaryClassificationEvaluator()
+    // We don't need as much data anymore :)
+    testResult.cache()
+    testResult.count()
+    input.unpersist(blocking = false)
+    train.unpersist(blocking = false)
+    test.unpersist(blocking = false)
+    // Make both PR and ROC evaluators
+    val prEvaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
       .setMetricName("areaUnderPR")
       .setLabelCol("label")
+    val prScore = prEvaluator.evaluate(testResult)
+    val rocEvaluator = new BinaryClassificationEvaluator()
+    // We have a pretty imbalanced class distribution
+      .setMetricName("areaUnderROC")
+      .setLabelCol("label")
     testResult.show()
-    val score = evaluator.evaluate(testResult)
-    println(s"Model score: $score")
-    (model, score, datasetSize, positives)
+    val rocScore = rocEvaluator.evaluate(testResult)
+    println(s"Model score: P:$prScore R:$rocScore")
+    (model, prScore, rocScore, datasetSize, positives)
   }
 
   // This is kind of a hack because word2vec is expensive and we want to expirement
@@ -193,7 +205,7 @@ class TrainingPipeline(sc: SparkContext) {
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast && false) {
       paramGridBuilder.addGrid(
-        classifier.numTrees, Array(1, 10, 20)
+        classifier.numTrees, Array(20, 30)
       ).addGrid(
         classifier.minInfoGain, Array(0.0, 0.0001)
       )
@@ -210,7 +222,7 @@ class TrainingPipeline(sc: SparkContext) {
       .setEvaluator(evaluator)
       .setEstimatorParamMaps(paramGrid)
       .setNumFolds(3)
-      .setParallelism(3)
+      .setParallelism(2)
       .setCollectSubModels(true)
     val cvModels = cv.fit(preppedData)
     val resultPipeline = new Pipeline().setStages(

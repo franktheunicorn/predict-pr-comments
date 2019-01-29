@@ -41,7 +41,7 @@ class BasicE2EModelTest extends FunSuite with SharedSparkContext {
     // Note: means our results are kind of BS but it's just for testing
     val synth = input.flatMap(x => List.fill(5)(x))
     val trainer = new TrainingPipeline(sc)
-    val (pipelineModel, score, datasetSize, positives) =
+    val (pipelineModel, prScore, rocScore, datasetSize, positives) =
       trainer.trainAndEvalModel(synth, split=List(0.5, 0.5), fast=true,
         dataprepPipelineLocation=dataprepModelTempPath)
     datasetSize should be > (positives)
