@@ -14,7 +14,7 @@ import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.ml.tuning.{CrossValidator, CrossValidatorModel, ParamGridBuilder}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature._
-import org.apache.spark.ml.classification.LogisticRegression
+import org.apache.spark.ml.classification._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
@@ -43,9 +43,11 @@ class TrainingPipeline(sc: SparkContext) {
     val (model, effectiveness, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
     model.write.save(s"$output/model")
     val cvStage = model.stages.last.asInstanceOf[CrossValidatorModel]
+    val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
+    val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
     val summary =
-      s"Train/model effectiveness was $effectiveness and scores ${cvStage.avgMetrics}" +
-      s" for ${cvStage.estimatorParamMaps} with $positives out of $datasetSize"
+      s"Train/model effectiveness was $effectiveness and scores ${avgMetrics}" +
+      s" for ${paramMaps} with $positives out of $datasetSize"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -177,13 +179,8 @@ class TrainingPipeline(sc: SparkContext) {
       .setOutputCol("features")
 
     // Create our simple classifier
-    val classifier = new LogisticRegression()
-      .setFeaturesCol("features").setLabelCol("label")
-    if (fast) {
-      classifier.setMaxIter(5)
-    } else {
-      classifier.setMaxIter(200)
-    }
+    val classifier = new RandomForestClassifier()
+      .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Put our Vector assembler and classifier together
     val estimatorPipeline = new Pipeline().setStages(Array(featureVec, classifier))
@@ -191,7 +188,10 @@ class TrainingPipeline(sc: SparkContext) {
     // Try and find some reasonable params
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast && false) {
-      paramGridBuilder.addGrid(classifier.elasticNetParam, Array(0.0, 0.2, 0.5))
+      paramGridBuilder.addGrid(
+        classifier.numTrees, Array(1, 10, 20, 50)
+      ).addGrid(
+        classifier.minInfoGain, Array(0.0, 0.0001))
     }
     val paramGrid = paramGridBuilder.build()
 
