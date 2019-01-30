@@ -153,15 +153,15 @@ class TrainingPipeline(sc: SparkContext) {
       val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
       // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
       val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
-      val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
-      val idf = new IDF().setInputCol("rawTf").setOutputCol("tf_idf").setMinDocFreq(10)
+      //val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")
+      //val idf = new IDF().setInputCol("rawTf").setOutputCol("tf_idf").setMinDocFreq(10)
       // Create our charlie brown christmasstree esque feature vector
       val featureVec = new VectorAssembler()
         .setInputCols(Array(
           "wordvecs",
           "only_spaces",
           "extension_index",
-          "tf_idf",
+          //"tf_idf",
           "line_length"))
         .setOutputCol("features")
 
@@ -172,8 +172,8 @@ class TrainingPipeline(sc: SparkContext) {
         extensionIndexer,
         tokenizer,
         word2vec,
-        hashingTf,
-        idf,
+        //hashingTf,
+        //idf,
         featureVec
         ))
       val prepModel = prepPipeline.fit(input)
@@ -205,7 +205,6 @@ class TrainingPipeline(sc: SparkContext) {
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Try and find some reasonable params
-    /*
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
       paramGridBuilder.addGrid(
@@ -226,9 +225,10 @@ class TrainingPipeline(sc: SparkContext) {
       .setNumFolds(3)
       .setParallelism(2)
       .setCollectSubModels(true)
-    val cvModels = cv.fit(preppedData)
-     */
+    val fitModel = cv.fit(preppedData)
+    /*
     val fitModel = classifier.fit(preppedData)
+     */
     val resultPipeline = new Pipeline().setStages(
       Array(prepModel, fitModel))
     // This should just copy the models over
