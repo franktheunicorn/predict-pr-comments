@@ -42,12 +42,15 @@ class TrainingPipeline(sc: SparkContext) {
     val partitionedInputs = inputData.repartition(inputParallelism)
     val (model, prScore, rocScore, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
     model.write.save(s"$output/model")
-    val cvStage = model.stages.last.asInstanceOf[CrossValidatorModel]
-    val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
-    val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
-    val summary =
-      s"Train/model effectiveness was pr: $prScore roc: $rocScore and CV pr scores: " +
-      s"${avgMetrics} for ${paramMaps} with $positives out of $datasetSize"
+    val cvSummary = model.stages.last match {
+      case cvStage: CrossValidatorModel =>
+        val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
+        val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
+        s"CV pr scores: ${avgMetrics} for ${paramMaps} with $positives out of $datasetSize"
+      case _ =>
+        "The final stage was not CV so no CV summary"
+    }
+    val summary = s"Train/model effectiveness was pr: $prScore roc: $rocScore $cvSummary"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -202,8 +205,9 @@ class TrainingPipeline(sc: SparkContext) {
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Try and find some reasonable params
+    /*
     val paramGridBuilder = new ParamGridBuilder()
-    if (!fast && false) {
+    if (!fast) {
       paramGridBuilder.addGrid(
         classifier.minInfoGain, Array(0.0, 0.0001)
       )
@@ -223,8 +227,10 @@ class TrainingPipeline(sc: SparkContext) {
       .setParallelism(2)
       .setCollectSubModels(true)
     val cvModels = cv.fit(preppedData)
+     */
+    val fitModel = classifier.fit(preppedData)
     val resultPipeline = new Pipeline().setStages(
-      Array(prepModel, cvModels))
+      Array(prepModel, fitModel))
     // This should just copy the models over
     resultPipeline.fit(balancedTrainingData)
   }
