@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+
+package suggester.service;
+option go_package = "suggester";
+option java_package = "com.github.com.holdenk.predict-pr-comments/suggester";
+option java_outer_classname = "SuggesterProtos";
+option optimize_for = SPEED;
+
+
+service ModelRequest {
+  rpc GetComment (GetCommentRequest) returns (GetCommentResponse) {}
+}
+
+message GetCommentRequest {
+  string pullRequestURL = 1;
+  string pullRequestPatchURL = 2;
+  string repoName = 3;
+}
+
+message GetCommentResponse {
+  string pullRequestURL = 1;
+  repeated FileNameLinePair fileNameLinePairs = 2;
+  string message = 3;
+}
+
+message FileNameLinePair {
+  string fileName = 1;
+  int32 lineNumber = 2;
+}

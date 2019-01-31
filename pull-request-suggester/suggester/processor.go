@@ -15,7 +15,9 @@ func process() {
 		nextEvent := Next()
 		githubEvent := nextEvent.Event
 		logger.Always("Processing event: %s", githubEvent.PullRequest.Title)
-	}
 
-	// Hook in here to call the model as we get a Pull Request Event
+		// Hook in here to call the model as we get a Pull Request Event
+
+		// TODO @kris-nova Hook in here
+	}
 }
