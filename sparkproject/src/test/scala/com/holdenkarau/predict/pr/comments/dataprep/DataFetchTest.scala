@@ -10,6 +10,38 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 class DataFetchTest extends FunSuite with SharedSparkContext {
+    test("Issue extraction regex - go") {
+    val goStackStrace = """
+01 goroutine 1 [running]:
+02 main.Example(0x2080c3f50, 0x2, 0x4, 0x425c0, 0x5, 0xa)
+           /Users/bill/Spaces/Go/Projects/src/github.com/goinaction/code/
+           temp/main.go:9 +0x64
+03 main.main()
+           /Users/bill/Spaces/Go/Projects/src/github.com/goinaction/code/
+           temp/main.go:5 +0x85
+"""
+      val expected = List(
+        IssueStackTrace("a", "main.go", 9),
+        IssueStackTrace("a", "main.go", 5))
+      val iir = IssueInputRecord("a", "c")
+      IssueDataFetch.extractStackTraces((iir, goStackStrace)).toList should contain theSameElementsAs expected
+    }
+
+    test("Issue extraction regex - java") {
+    val javaStackStrace = """
+Exception in thread "main" java.lang.NullPointerException
+        at com.example.myproject.Book.getTitle(Book.java:16)
+        at com.example.myproject.Author.getBookTitles(Author.java:25)
+        at com.example.myproject.Bootstrap.main(Bootstrap.java:14)"""
+    val expected = List(
+      IssueStackTrace("b", "Book.java", 16),
+      IssueStackTrace("b", "Author.java", 25),
+      IssueStackTrace("b", "Bootstrap.java", 14))
+    val iir = IssueInputRecord("b", "c")
+    IssueDataFetch.extractStackTraces((iir, javaStackStrace)).toList should contain theSameElementsAs expected
+
+  }
+
   val standardInputList = List(
     """pull_request_url,pull_patch_url,comments_positions_space_delimited,comments_original_positions_space_delimited,comment_file_paths_json_encoded,comment_commit_ids_space_delimited""",
     "https://api.github.com/repos/Dreamacro/clash/pulls/96,https://github.com/Dreamacro/clash/pull/96.patch,42 -1,42 42,\"[\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\",\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\"]\",\"\"\"de976981dff604f3f41167012ddb82b3e0c90e6d\"\" \"\"0b44c7a83aa400caf5db40975a75428682431309\"\"\"")
@@ -92,5 +124,4 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     result.as[ResultData].collect()(0).diff should include ("@@ -")
     result.as[ResultData].collect()(0).diff should not include ("Subject: [PATCH")
   }
-
 }
