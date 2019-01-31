@@ -6,13 +6,13 @@ gcloud container clusters get-credentials tigeycluster --zone us-central1-a --pr
 # Upload the jar
 ./upload_spark_jar.sh 
 # Train the model
-export APP_PREFIX="ml18a-rf-test"
-export MEMORY_OVERHEAD_FRACTION=0.45
+export APP_PREFIX="ml20a-rf-withcv-test"
+export MEMORY_OVERHEAD_FRACTION=0.40
 export SPARK_EXEC_MEMORY=35g
 # Kick off dev & full at the same time
 VERSION=dev APP_NAME="$APP_PREFIX$VERSION" NUM_EXECS=30 SPARK_DEFAULT_PARALLELISM=100 MAIN_CLASS=com.holdenkarau.predict.pr.comments.sparkProject.ml.MlSCApp INPUT=gs://frank-the-unicorn/$VERSION/output OUTPUT=gs://frank-the-unicorn/$VERSION/ml-$APP_PREFIX CACHE=gs://frank-the-unicorn/$VERSION/ml/dataprep-cache-notfidf ./run_spark_data_process.sh &
 piddev=$!
-MEMORY_OVERHEAD_FRACTION=0.55 VERSION=full APP_NAME="$APP_PREFIX$VERSION" NUM_EXECS=150 SPARK_DEFAULT_PARALLELISM=1000 MAIN_CLASS=com.holdenkarau.predict.pr.comments.sparkProject.ml.MlSCApp INPUT=gs://frank-the-unicorn/$VERSION/output OUTPUT=gs://frank-the-unicorn/$VERSION/ml-$APP_PREFIX CACHE=gs://frank-the-unicorn/$VERSION/ml/dataprep-cache-notfidf ./run_spark_data_process.sh &
+VERSION=full APP_NAME="$APP_PREFIX$VERSION" NUM_EXECS=150 SPARK_DEFAULT_PARALLELISM=1000 MAIN_CLASS=com.holdenkarau.predict.pr.comments.sparkProject.ml.MlSCApp INPUT=gs://frank-the-unicorn/$VERSION/output OUTPUT=gs://frank-the-unicorn/$VERSION/ml-$APP_PREFIX CACHE=gs://frank-the-unicorn/$VERSION/ml/dataprep-cache-notfidf ./run_spark_data_process.sh &
 pidfull = $!
 wait $pidfull
 

@@ -46,11 +46,12 @@ class TrainingPipeline(sc: SparkContext) {
       case cvStage: CrossValidatorModel =>
         val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
         val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
-        s"CV pr scores: ${avgMetrics} for ${paramMaps} with $positives out of $datasetSize"
+        s"CV pr scores: ${avgMetrics} for ${paramMaps}"
       case _ =>
         "The final stage was not CV so no CV summary"
     }
-    val summary = s"Train/model effectiveness was pr: $prScore roc: $rocScore $cvSummary"
+    val dataSummary = s"with $positives out of $datasetSize"
+    val summary = s"Train/model effectiveness was pr: $prScore roc: $rocScore $cvSummary & data: $dataSummary"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
@@ -212,7 +213,6 @@ class TrainingPipeline(sc: SparkContext) {
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Try and find some reasonable params
-    /*
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
       paramGridBuilder.addGrid(
@@ -234,9 +234,10 @@ class TrainingPipeline(sc: SparkContext) {
       .setParallelism(2)
       .setCollectSubModels(true)
     val fitModel = cv.fit(preppedData)
-     */
     println("****PANDA***: fitting model")
+    /*
     val fitModel = classifier.fit(preppedData)
+     */
     println("****PANDA***: fitting final pipeline")
     val resultPipeline = new Pipeline().setStages(
       Array(prepModel, fitModel))
