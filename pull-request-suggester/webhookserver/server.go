@@ -59,6 +59,10 @@ func Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	suggester.RegisterRequest(r, &event)
+	w.Write([]byte("200 Great Success!"))
+	w.WriteHeader(200)
+
 	return
 }
 
