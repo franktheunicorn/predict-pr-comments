@@ -1,6 +1,7 @@
 package suggester
 
 import (
+	"github.com/google/go-github/github"
 	"net/http"
 	"sync"
 	"time"
@@ -8,6 +9,7 @@ import (
 
 type PullRequestEvent struct {
 	Request *http.Request
+	Event   *github.PullRequestEvent
 }
 
 var (
@@ -15,9 +17,10 @@ var (
 	queuemutex = sync.Mutex{}
 )
 
-func RegisterRequest(request *http.Request) {
+func RegisterRequest(request *http.Request, event *github.PullRequestEvent) {
 	pre := &PullRequestEvent{
 		Request: request,
+		Event:   event,
 	}
 	queuemutex.Lock()
 	queue = append(queue, pre)
