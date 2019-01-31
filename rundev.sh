@@ -6,7 +6,7 @@ gcloud container clusters get-credentials tigeycluster --zone us-central1-a --pr
 # Upload the jar
 ./upload_spark_jar.sh 
 # Train the model
-export APP_PREFIX="ml17b-rf-test"
+export APP_PREFIX="ml18a-rf-test"
 export MEMORY_OVERHEAD_FRACTION=0.45
 export SPARK_EXEC_MEMORY=35g
 # Kick off dev & full at the same time

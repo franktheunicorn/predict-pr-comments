@@ -109,14 +109,17 @@ class TrainingPipeline(sc: SparkContext) {
     val train = splits(0)
     val test = splits(1)
     val model = trainModel(train, dataprepPipelineLocation, fast)
+    println("****PANDA***: testing")
     val testResult = model.transform(prepareTrainingData(test))
     // We don't need as much data anymore :)
+    train.unpersist(blocking = false)
     testResult.cache()
     testResult.count()
+    println("****PANDA***: test result set computed")
     input.unpersist(blocking = false)
-    train.unpersist(blocking = false)
     test.unpersist(blocking = false)
     // Make both PR and ROC evaluators
+    println("****PANDA***: evaluating")
     val prEvaluator = new BinaryClassificationEvaluator()
     // We have a pretty imbalanced class distribution
       .setMetricName("areaUnderPR")
@@ -192,19 +195,24 @@ class TrainingPipeline(sc: SparkContext) {
     fast: Boolean = false) = {
     val preparedTrainingData = prepareTrainingData(input)
     // Balanace the training data
+    println("****PANDA***: balancing classes.")
     val balancedTrainingData = balanceClasses(preparedTrainingData)
 
+    println("****PANDA***: training or loading data prep pipeline")
     val prepModel = trainAndSaveOrLoadDataPrepModel(balancedTrainingData,
       dataprepPipelineLocation)
+    println("****PANDA***: prepairing data")
     val preppedData = prepModel.transform(balancedTrainingData)
     preppedData.cache().count()
-    
+    println("****PANDA***: prepaired data")
+
 
     // Create our simple classifier
     val classifier = new RandomForestClassifier()
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Try and find some reasonable params
+    /*
     val paramGridBuilder = new ParamGridBuilder()
     if (!fast) {
       paramGridBuilder.addGrid(
@@ -226,13 +234,16 @@ class TrainingPipeline(sc: SparkContext) {
       .setParallelism(2)
       .setCollectSubModels(true)
     val fitModel = cv.fit(preppedData)
-    /*
-    val fitModel = classifier.fit(preppedData)
      */
+    println("****PANDA***: fitting model")
+    val fitModel = classifier.fit(preppedData)
+    println("****PANDA***: fitting final pipeline")
     val resultPipeline = new Pipeline().setStages(
       Array(prepModel, fitModel))
     // This should just copy the models over
-    resultPipeline.fit(balancedTrainingData)
+    val rpm = resultPipeline.fit(balancedTrainingData)
+    println("****PANDA***: done fitting model")
+    rpm
   }
 }
 
