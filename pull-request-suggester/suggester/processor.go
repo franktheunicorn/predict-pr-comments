@@ -1,5 +1,7 @@
 package suggester
 
+import "github.com/kris-nova/logger"
+
 func StartConcurrentPullRequestProcessor() {
 	// error
 	// register client
@@ -8,9 +10,12 @@ func StartConcurrentPullRequestProcessor() {
 }
 
 func process() {
-	//	for {
 
-	// Loops
-	//	}
-	// error
+	for {
+		nextEvent := Next()
+		githubEvent := nextEvent.Event
+		logger.Always("Processing event: %s", githubEvent.PullRequest.Title)
+	}
+
+	// Hook in here to call the model as we get a Pull Request Event
 }
