@@ -11,7 +11,7 @@ lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
       organization := "com.holdenkarau.predict.pr.comments",
-      scalaVersion := "2.11.8"
+      scalaVersion := "2.11.12"
     )),
     name := "sparkProject",
     version := "0.0.1",
@@ -37,7 +37,7 @@ lazy val root = (project in file(".")).
 
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
       // for gRPC
-      "io.grpc"                %  "grpc-netty"           % "1.4.0",
+      "io.grpc"                %  "grpc-netty-shaded"           % "1.9.1",
       "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion
     ),
 
@@ -50,6 +50,7 @@ lazy val root = (project in file(".")).
     mergeStrategy in assembly := {
       case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
       case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case m if m.toLowerCase.endsWith("git.properties") => MergeStrategy.discard
         // Travis is giving a weird error on netty I don't see locally :(
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
       case PathList("META-INF", "native", xs @ _*) => MergeStrategy.deduplicate
