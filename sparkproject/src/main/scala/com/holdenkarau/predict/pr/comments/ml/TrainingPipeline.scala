@@ -217,6 +217,8 @@ class TrainingPipeline(sc: SparkContext) {
     if (!fast) {
       paramGridBuilder.addGrid(
         classifier.minInfoGain, Array(0.0, 0.0001)
+      ).addGrid(
+        classifier.numTrees, Array(1, 20)
       )
     }
     val paramGrid = paramGridBuilder.build()
