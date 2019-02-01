@@ -209,7 +209,7 @@ class TrainingPipeline(sc: SparkContext) {
 
 
     // Create our simple classifier
-    val classifier = new RandomForestClassifier()
+    val classifier = new GBTClassifier()
       .setFeaturesCol("features").setLabelCol("label").setMaxBins(50)
 
     // Try and find some reasonable params
@@ -217,8 +217,6 @@ class TrainingPipeline(sc: SparkContext) {
     if (!fast) {
       paramGridBuilder.addGrid(
         classifier.minInfoGain, Array(0.0, 0.0001)
-      ).addGrid(
-        classifier.numTrees, Array(1, 20)
       )
     }
     val paramGrid = paramGridBuilder.build()
