@@ -21,6 +21,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"reflect"
 
@@ -35,7 +37,7 @@ const (
 	// Query is our main query we can manipulate as needed. This is interpolated later so expect a few erroneous %'s
 	// Thanks to Holden Karau for writing the query <3
 	RawQuery = `SELECT repo.name, JSON_EXTRACT(payload, '$.issue.url') 
-AS url FROM (SELECT *, JSON_EXTRACT(payload, '$.action') AS action FROM ` + "`githubarchive.day.20*`" + ` WHERE type = "IssuesEvent")
+AS url FROM (SELECT *, JSON_EXTRACT(payload, '$.action') AS action FROM ` + "`githubarchive.day.%s*`" + ` WHERE type = "IssuesEvent")
 WHERE type = "IssuesEvent"  AND action = "\"opened\"" %s`
 )
 
@@ -81,12 +83,20 @@ func PullDataSet(opt *Options) (*DataSet, error) {
 
 	// Interpolate the query
 	// 1 string data such as (2018) or (20190106)
+	if opt.DateString == "yesterday" {
+		yesterday := strings.Replace(
+			strings.Split(
+				time.Now().AddDate(
+					0, 0, -1).Format(
+					"2006-01-02 15:04:05"), " ")[0], "-", "", -1)
+		opt.DateString = yesterday
+	}
 	// 2 string limit clause if applicable
 	var interpolatedQuery string
 	if opt.CellLimit == -1 {
-		interpolatedQuery = fmt.Sprintf(RawQuery, "")
+		interpolatedQuery = fmt.Sprintf(RawQuery, opt.DateString, "")
 	} else {
-		interpolatedQuery = fmt.Sprintf(RawQuery, fmt.Sprintf("LIMIT %d", opt.CellLimit))
+		interpolatedQuery = fmt.Sprintf(RawQuery, opt.DateString, fmt.Sprintf("LIMIT %d", opt.CellLimit))
 	}
 
 	// Initalize a new DataSet
