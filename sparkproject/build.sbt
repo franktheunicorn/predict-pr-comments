@@ -6,6 +6,8 @@ import com.trueaccord.scalapb.compiler.Version.scalapbVersion
 val sparkVersion = "2.4.0"
 lazy val root = (project in file(".")).
 
+
+
   settings(
     inThisBuild(List(
       organization := "com.holdenkarau.predict.pr.comments",
@@ -21,8 +23,7 @@ lazy val root = (project in file(".")).
     fork := true,
 
     coverageHighlighting := true,
-    PB.protoSources.in(Compile) := Seq(sourceDirectory.in(Compile).value / "proto"),
-    PB.targets.in(Compile) := Seq(scalapb.gen() -> sourceManaged.in(Compile).value),
+
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
       "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
@@ -34,11 +35,13 @@ lazy val root = (project in file(".")).
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
 
-      "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbVersion % "protobuf",
-      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
-      "io.grpc" % "grpc-netty" % "1.0.1"
+      "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
+      // for gRPC
+      "io.grpc"                %  "grpc-netty"           % "1.4.0",
+      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion,
+      // for JSON conversion
+      "com.trueaccord.scalapb" %% "scalapb-json4s"       % "0.3.0"
     ),
-
 
 
     // uses compile classpath for the run task, including "provided" jar (cf http://stackoverflow.com/a/21803413/3827)
@@ -82,4 +85,6 @@ lazy val root = (project in file(".")).
     }
   )
 
-
+PB.targets in Compile := Seq(
+  scalapb.gen() -> (sourceManaged in Compile).value
+)
