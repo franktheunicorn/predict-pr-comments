@@ -25,8 +25,8 @@ lazy val root = (project in file(".")).
     coverageHighlighting := true,
 
     libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
-      "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
+      "org.apache.spark" %% "spark-sql" % sparkVersion,
+      "org.apache.spark" %% "spark-mllib" % sparkVersion,
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
       "com.github.marklister" %% "product-collections" % "1.4.5",
@@ -38,9 +38,7 @@ lazy val root = (project in file(".")).
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
       // for gRPC
       "io.grpc"                %  "grpc-netty"           % "1.4.0",
-      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion,
-      // for JSON conversion
-      "com.trueaccord.scalapb" %% "scalapb-json4s"       % "0.3.0"
+      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion
     ),
 
 
