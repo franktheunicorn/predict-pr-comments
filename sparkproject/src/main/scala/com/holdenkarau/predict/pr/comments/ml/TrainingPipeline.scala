@@ -46,12 +46,12 @@ class TrainingPipeline(sc: SparkContext) {
       case cvStage: CrossValidatorModel =>
         val paramMaps = cvStage.getEstimatorParamMaps.map(_.toString).toList
         val avgMetrics = cvStage.avgMetrics.map(_.toString).toList
-        s"CV pr scores: ${avgMetrics} for ${paramMaps}"
+        s"CV pr scores (on balanced classes!): ${avgMetrics} for ${paramMaps}"
       case _ =>
         "The final stage was not CV so no CV summary"
     }
     val dataSummary = s"with $positives out of $datasetSize"
-    val summary = s"Train/model effectiveness was pr: $prScore roc: $rocScore $cvSummary & data: $dataSummary"
+    val summary = s"Train/model effectiveness (no-rebalance) was pr: $prScore roc: $rocScore $cvSummary & data: $dataSummary"
     sc.parallelize(List(summary), 1).saveAsTextFile(s"$output/effectiveness")
   }
 
