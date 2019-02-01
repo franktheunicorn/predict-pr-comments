@@ -42,6 +42,30 @@ Exception in thread "main" java.lang.NullPointerException
 
   }
 
+  test("Live Issue extraction") {
+    val session = SparkSession.builder().getOrCreate()
+    import session.implicits._
+    val issueDataFetch = new IssueDataFetch(sc)
+
+    val issueInputList = List("name,url",
+      "holdenk/spark-testing-base,\"\"\"https://github.com/holdenk/spark-testing-base/issues/132\"\"\"")
+    val inputRDD = sc.parallelize(issueInputList, 1)
+    val inputData = issueDataFetch.loadInput(session.createDataset(inputRDD)).as[IssueInputRecord]
+    val result = issueDataFetch.processInput(inputData).collect()
+
+    val expected = List(
+      IssueStackTrace("holdenk/spark-testing-base", "TestSuite.scala",13),
+      IssueStackTrace("holdenk/spark-testing-base", "FooSpec.scala",8),
+      IssueStackTrace("holdenk/spark-testing-base", "DataFrameSuiteBase.scala",83),
+      IssueStackTrace("holdenk/spark-testing-base", "FooSpec.scala",8),
+      IssueStackTrace("holdenk/spark-testing-base", "FooSpec.scala",14),
+      IssueStackTrace("holdenk/spark-testing-base", "FooSpec.scala",9),
+      IssueStackTrace("holdenk/spark-testing-base", "OutcomeOf.scala",85))
+    result.toList should contain theSameElementsAs expected
+
+  }
+
+
   val standardInputList = List(
     """pull_request_url,pull_patch_url,comments_positions_space_delimited,comments_original_positions_space_delimited,comment_file_paths_json_encoded,comment_commit_ids_space_delimited""",
     "https://api.github.com/repos/Dreamacro/clash/pulls/96,https://github.com/Dreamacro/clash/pull/96.patch,42 -1,42 42,\"[\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\",\"\"\\\"\"rules/from_ipcidr.go\\\"\"\"\"]\",\"\"\"de976981dff604f3f41167012ddb82b3e0c90e6d\"\" \"\"0b44c7a83aa400caf5db40975a75428682431309\"\"\"")

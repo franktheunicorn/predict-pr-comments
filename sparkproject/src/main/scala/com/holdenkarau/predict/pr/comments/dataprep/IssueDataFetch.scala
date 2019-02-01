@@ -30,11 +30,16 @@ class IssueDataFetch(sc: SparkContext) {
     val rawInputData = loadInput(input)
     val inputData = rawInputData.as[IssueInputRecord]
 
-    val issues = inputData.mapPartitions(IssueDataFetch.fetchIssuesIterator)
-    val resultData = issues.flatMap(IssueDataFetch.extractStackTraces)
-
+    val resultData = processInput(inputData)
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
+
+  def processInput(inputData: Dataset[IssueInputRecord]) = {
+    val issues = inputData.mapPartitions(IssueDataFetch.fetchIssuesIterator)
+    val resultData = issues.flatMap(IssueDataFetch.extractStackTraces)
+    resultData
+  }
+
 
   def createCSVReader() = {
     session.read.format("csv")
@@ -101,7 +106,7 @@ object IssueDataFetch {
   def extractStackTraces(input: (IssueInputRecord, String)): Iterator[IssueStackTrace] = {
     val record: IssueInputRecord = input._1
     val inputStr = input._2
-    val repo = record.reponame
+    val repo = record.name
     // TODO: better regex
     // Scala regex is jank with handling escaped () so just strip them as " "s
     val cleanedStr = inputStr.replaceAll(raw"\)", " ").replaceAll(raw"\(", " ")
