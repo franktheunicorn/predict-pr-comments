@@ -1,5 +1,8 @@
 // give the user a nice default project!
 
+// import ScalaPB
+import com.trueaccord.scalapb.compiler.Version.scalapbVersion
+
 val sparkVersion = "2.4.0"
 lazy val root = (project in file(".")).
 
@@ -18,7 +21,8 @@ lazy val root = (project in file(".")).
     fork := true,
 
     coverageHighlighting := true,
-
+    PB.protoSources.in(Compile) := Seq(sourceDirectory.in(Compile).value / "proto"),
+    PB.targets.in(Compile) := Seq(scalapb.gen() -> sourceManaged.in(Compile).value),
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
       "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
@@ -28,13 +32,14 @@ lazy val root = (project in file(".")).
 
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
-      "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test" 
+      "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
+
+      "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbVersion % "protobuf",
+      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
+      "io.grpc" % "grpc-netty" % "1.0.1"
     ),
 
-    libraryDependencies ++= Seq(
-        "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
-        "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
-    ),
+
 
     // uses compile classpath for the run task, including "provided" jar (cf http://stackoverflow.com/a/21803413/3827)
     run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated,
