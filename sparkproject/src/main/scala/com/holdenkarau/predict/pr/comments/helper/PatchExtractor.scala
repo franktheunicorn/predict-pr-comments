@@ -58,10 +58,10 @@ object PatchExtractor {
           oldPos = op.toInt - 1
           newPos = np.toInt - 1
           None
-        case addedLine(lineText) if seenDiff && newPos != null =>
+        case addedLine(lineText) if seenDiff && newPos != null && lineText.length < 2000 =>
           newPos = newPos + 1
           Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, true))
-        case removedLine(lineText) if seenDiff && newPos != null =>
+        case removedLine(lineText) if seenDiff && newPos != null && lineText.length < 2000 =>
           oldPos = oldPos + 1
           Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, false))
         case _ if seenDiff && newPos != null =>
