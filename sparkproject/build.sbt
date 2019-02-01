@@ -38,7 +38,9 @@ lazy val root = (project in file(".")).
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
       // for gRPC
       "io.grpc"                %  "grpc-netty-shaded"           % "1.9.1",
-      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion
+      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion,
+      // Added so that we use netty 4.1.30 not trying to mix and match 2 different versions
+      "io.netty" % "netty-all" % "4.1.30.Final"
     ),
 
 
@@ -55,9 +57,22 @@ lazy val root = (project in file(".")).
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
       case PathList("META-INF", "native", xs @ _*) => MergeStrategy.deduplicate
       case PathList("META-INF", xs @ _ *) => MergeStrategy.discard
-      case PathList("javax", "servlet", xs @ _*) => MergeStrategy.first
-      case PathList("org", "apache", xs @ _*) => MergeStrategy.first
-      case PathList("org", "jboss", xs @ _*) => MergeStrategy.first
+      case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
+      case PathList("org", "apache", xs @ _*) => MergeStrategy.last
+      case PathList("org", "jboss", xs @ _*) => MergeStrategy.last
+        // Start http://queirozf.com/entries/creating-scala-fat-jars-for-spark-on-sbt-with-sbt-assembly-plugin
+      case PathList("org","aopalliance", xs @ _*) => MergeStrategy.last
+      case PathList("javax", "inject", xs @ _*) => MergeStrategy.last
+      case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
+      case PathList("javax", "activation", xs @ _*) => MergeStrategy.last
+      case PathList("org", "apache", xs @ _*) => MergeStrategy.last
+      case PathList("com", "google", xs @ _*) => MergeStrategy.last
+      case PathList("com", "esotericsoftware", xs @ _*) => MergeStrategy.last
+      case PathList("com", "codahale", xs @ _*) => MergeStrategy.last
+      case PathList("com", "yammer", xs @ _*) => MergeStrategy.last
+        // End http://queirozf.com/entries/creating-scala-fat-jars-for-spark-on-sbt-with-sbt-assembly-plugin
+      case PathList("com", "sun", "activation", "registries", xs @ _*) => MergeStrategy.last
+      case PathList("com", "sun", "activation", "viewers", xs @ _*) => MergeStrategy.last
       case "about.html"  => MergeStrategy.rename
       case "reference.conf" => MergeStrategy.concat
       case m =>
