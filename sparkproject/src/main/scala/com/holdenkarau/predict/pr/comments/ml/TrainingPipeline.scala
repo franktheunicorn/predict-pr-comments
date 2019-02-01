@@ -234,7 +234,7 @@ class TrainingPipeline(sc: SparkContext) {
       .setEstimatorParamMaps(paramGrid)
       .setNumFolds(3)
       .setParallelism(2)
-      .setCollectSubModels(true)
+      .setCollectSubModels(false)
     val fitModel = cv.fit(preppedData)
     println("****PANDA***: fitting model")
     /*
