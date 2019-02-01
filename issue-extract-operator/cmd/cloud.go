@@ -73,7 +73,7 @@ var cloudCmd = &cobra.Command{
 				os.Exit(96)
 			}
 			// Note we do not check for existing here as this is the procederual script
-			err = handler.MutableSyncBytes(buffer, fmt.Sprintf("issue_urls/data_%d.csv", queeropts.CellLimit))
+			err = handler.MutableSyncBytes(buffer, fmt.Sprintf("issue_urls/%s.csv", queeropts.DateString))
 			if err != nil {
 				logger.Critical("Unable to sync bytes: %v", err)
 				os.Exit(95)
