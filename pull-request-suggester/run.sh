@@ -14,9 +14,7 @@
 # limitations under the License.
 set -e
 make build
-ieo cloud \
-    --google-project boos-demo-projects-are-rad \
-    --cell-limit -1 \
-    --date 2019 \
-    --auth-file ~/.nova_credentials.json \
-    --bucket tigeys-buckets-are-rad
+prs \
+    --hostname ""\
+    --port 777
+

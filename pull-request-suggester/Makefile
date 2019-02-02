@@ -45,7 +45,7 @@ deploy: ## Deploy to Kubernetes
 	. ./deploy.sh
 
 build: ## Compile the binary into $GOPATH
-	go build -o $(GOPATH)/bin/deo
+	go build -o $(GOPATH)/bin/prs
 
 ingress: ## Install ingress for the cluster
 	kubectl apply -f https://j.hept.io/contour-deployment-rbac

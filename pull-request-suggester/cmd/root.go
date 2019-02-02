@@ -16,11 +16,16 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor"
 	"github.com/holdenk/predict-pr-comments/pull-request-suggester/webhookserver"
 	"github.com/kris-nova/logger"
 	"github.com/kris-nova/lolgopher"
 	"github.com/spf13/cobra"
 	"os"
+)
+
+var (
+	options = &processor.ClientOptions{}
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -29,9 +34,28 @@ var RootCmd = &cobra.Command{
 	Short: "HTTP server to serve as a webhook for Pull Request events",
 	Long:  `HTTP server to serve as a webhook for Pull Request events`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO handle errors
-		webhookserver.Register()
-		webhookserver.Serve()
+		err := webhookserver.Register()
+		if err != nil {
+			logger.Critical("Unable to register webhook server: %v", err)
+			os.Exit(69)
+		}
+		// Start the Processor
+		go func() {
+			logger.Info("Starting frank process...")
+			err := processor.StartConcurrentProcessorClient(options)
+			if err != nil {
+				logger.Critical("Critical error with suggester: %v", err)
+				os.Exit(71)
+			}
+		}()
+		// Start the HTTP Webhook Server
+		err = webhookserver.Serve()
+		if err != nil {
+			logger.Critical("Error from the webhook server: %v", err)
+			os.Exit(70)
+		}
+		logger.Always("Complete")
+		os.Exit(1)
 	},
 }
 
@@ -47,5 +71,8 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&logger.Fabulous, "fabulous", "f", false, "Toggle rainbow logs")
 	RootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
 	RootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
-
+	RootCmd.Flags().StringVarP(&options.ModelServerHostname, "hostname", "b", "", "The hostname to use for the client to connect to the model server")
+	RootCmd.Flags().StringVarP(&options.ModelServerPort, "port", "p", "777", "The port to use for the client to connect to the model server")
+	RootCmd.Flags().StringVarP(&options.GithubClientUsername, "username", "u", "", "The username to use for the client for GitHub")
+	RootCmd.Flags().StringVarP(&options.GithubClientPassword, "password", "x", "", "The password to use for the client for GitHub")
 }

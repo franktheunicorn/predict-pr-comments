@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
-	"github.com/holdenk/predict-pr-comments/pull-request-suggester/suggester"
+	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -28,17 +28,13 @@ var (
 func Register() error {
 	logger.Info("Registering webhook and auth endpoints...")
 	router.HandleFunc("/webhook", Webhook)
-	router.HandleFunc("/auth", Auth)
+	//router.HandleFunc("/auth", Auth)
 	//http.Handle("/", router)
 	return nil
 }
 
 func Serve() error {
-	go func() {
-		// Kick off Frank
-		logger.Info("Starting frank process...")
-		suggester.StartConcurrentPullRequestProcessor()
-	}()
+
 	http.ListenAndServe(":80", router)
 	return nil
 }
@@ -47,21 +43,21 @@ func Webhook(w http.ResponseWriter, r *http.Request) {
 
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
 		w.WriteHeader(500)
+		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
 		return
 	}
 	event := github.PullRequestEvent{}
-	err = json.Unmarshal(bytes, event)
+	err = json.Unmarshal(bytes, &event)
 	if err != nil {
-		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
 		w.WriteHeader(500)
+		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
 		return
 	}
 
-	suggester.RegisterRequest(r, &event)
-	w.Write([]byte("200 Great Success!"))
+	processor.RegisterRequest(r, &event)
 	w.WriteHeader(200)
+	w.Write([]byte("200 Great Success!"))
 
 	return
 }
