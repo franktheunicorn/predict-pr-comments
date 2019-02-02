@@ -15,11 +15,12 @@ message GetCommentRequest {
 
 message GetCommentResponse {
   string pullRequestURL = 1;
-  repeated FileNameLinePair fileNameLinePairs = 2;
+  repeated FileNameCommitIDPosition fileNameCommitIDPositions = 2;
   string message = 3;
 }
 
-message FileNameLinePair {
+message FileNameCommitIDPosition {
   string fileName = 1;
-  int32 lineNumber = 2;
+  string commitID = 2;
+  int32  position = 3;
 }
