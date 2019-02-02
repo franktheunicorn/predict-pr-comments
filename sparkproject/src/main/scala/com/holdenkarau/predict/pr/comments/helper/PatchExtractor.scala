@@ -66,7 +66,7 @@ object PatchExtractor {
           linesFromHeader = linesFromHeader + 1
           newPos = newPos + 1
           if (lineText.length < 2000) {
-            Some(PatchRecord(commitId, oldPos, newPos, linesFromHeader, lineText, filename, true))
+            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, true))
           } else {
             None
           }
@@ -74,7 +74,7 @@ object PatchExtractor {
           linesFromHeader = linesFromHeader + 1
           oldPos = oldPos + 1
           if (lineText.length < 2000) {
-            Some(PatchRecord(commitId, oldPos, newPos, linesFromHeader, lineText, filename, false))
+            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, false))
           } else {
             None
           }

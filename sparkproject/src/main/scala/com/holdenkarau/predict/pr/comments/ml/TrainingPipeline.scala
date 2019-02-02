@@ -21,10 +21,10 @@ import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, PatchRecord, IssueStackTrace}
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
-case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean, line: Int)
+case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean, line: Int, commit_id: Option[String]=None, offset: Option[Int]=None)
 // LabeledRecord - line + extension and label and line length as a double + found in issue
 case class PreparedData(text: String, filename: String, add: Boolean, commented: Double,
-  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double, commit_id: String, offset: Int)
+  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double, commit_id: Option[String]=None, offset: Option[Int]=None)
 
 
 class TrainingPipeline(sc: SparkContext) {
@@ -86,7 +86,7 @@ class TrainingPipeline(sc: SparkContext) {
         "only_spaces", expr("""text rlike "^\s+$" """).cast("double"))
       .withColumn(
         "not_in_issues", isnull($"pandas").cast("double"))
-      .select($"text", $"labaeledRecords.filename", $"add", $"commented", $"extension", $"line_length", $"label", $"only_spaces", $"not_in_issues")
+      .select($"text", $"labaeledRecords.filename", $"add", $"commented", $"extension", $"line_length", $"label", $"only_spaces", $"not_in_issues", $"commit_id", $"offset")
       .as[PreparedData]
   }
 

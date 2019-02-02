@@ -26,17 +26,21 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
 
   override def getComment(request: GetCommentRequest) = {
     val pullRequestPatchURL = request.pullRequestPatchURL
-    val diffFuture = DataFetch.fetchDiffForPatchUrl(pullRequestPatchURL)
-    diffFuture.map(diff => predictOnResponse(request, diff))
+    val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
+    patchFuture.map(patch => predictOnResponse(request, patch))
   }
 
-  def predictOnResponse(request: GetCommentRequest, diffResponse: Response[String]):
+  def predictOnResponse(request: GetCommentRequest, patchResponse: Response[String]):
       GetCommentResponse = {
     // TODO(holden): check the status processResponse
     //if (diffResponse.code == StatusCodes.Ok) {
     //}
-    val diff = diffResponse.unsafeBody
-    val patchRecords = PatchExtractor.processPatch(patch=diff, diff=true)
+    val patch = patchResponse.unsafeBody
+    predictOnPatch(request.repoName, request.pullRequestURL, patch)
+  }
+
+  def predictOnPatch(repoName: String, pullRequestURL: String, patch: String) = {
+    val patchRecords = PatchExtractor.processPatch(patch=patch, diff=false)
     val elems = patchRecords.map{record =>
       val extension = TrainingPipeline.extractExtension(record.filename).getOrElse(null)
       val oldPos = if (record.oldPos == null) {
@@ -51,7 +55,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
       }
 
       val foundIssueCount = issueData
-        .filter($"project" === request.repoName)
+        .filter($"project" === repoName)
         .filter($"filename" === record.filename)
         .filter($"line" === oldPos)
         .count()
@@ -72,7 +76,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
           case 0 => 1.0
           case _ => 0.0
         }, // Not in issues
-        commit_id = record.commitId,
+        commit_id = Some(record.commitId),
         offset = record.linesFromHeader
       )
     }
@@ -83,7 +87,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     val positivePredictions = positivePredictionsDF.collect()
     val positivePredictionFP = positivePredictions.map(r =>
       FileNameLinePair(r.filename, r.line))
-    GetCommentResponse(request.pullRequestURL, positivePredictionFP)
+    GetCommentResponse(pullRequestURL, positivePredictionFP)
   }
 }
 

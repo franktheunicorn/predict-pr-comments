@@ -151,10 +151,16 @@ object DataFetch {
     diffResponseFuture
   }
 
-  def fetchPatchAndDiffForURL(patchUrl: String): (Future[Response[String]], Future[Response[String]]) = {
+  def fetchPatchForPatchUrl(patchUrl: String): Future[Response[String]] = {
     val patchRequest = sttp
       .get(uri"${patchUrl}")
     val patchResponseFuture = patchRequest.send()
+    patchResponseFuture
+  }
+
+
+  def fetchPatchAndDiffForURL(patchUrl: String): (Future[Response[String]], Future[Response[String]]) = {
+    val patchResponseFuture = fetchPatchForPatchUrl(patchUrl)
     val diffResponseFuture = fetchDiffForPatchUrl(patchUrl)
     (patchResponseFuture, diffResponseFuture)
   }
