@@ -60,7 +60,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
         filename=record.filename,
         add=record.add,
         // TODO: Hack fix this in training pipeline later
-        commented=newPos.toDouble,// commented, stripped anyways -- Going to encode some info I needed oops
+        commented=0.0,// commented, stripped anyways -- Going to encode some info I needed oops
         extension=extension,
         line_length=record.text.length,
         label=0.0, // label stripped anyways
@@ -71,7 +71,9 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
         not_in_issues = foundIssueCount match {
           case 0 => 1.0
           case _ => 0.0
-        } // Not in issues
+        }, // Not in issues
+        commit_id = record.commitId,
+        offset = record.linesFromHeader
       )
     }
     val elemsDF = session.createDataFrame(elems)

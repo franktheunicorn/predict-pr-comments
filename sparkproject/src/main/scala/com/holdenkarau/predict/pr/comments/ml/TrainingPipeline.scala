@@ -24,7 +24,7 @@ import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean, line: Int)
 // LabeledRecord - line + extension and label and line length as a double + found in issue
 case class PreparedData(text: String, filename: String, add: Boolean, commented: Double,
-  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double)
+  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double, commit_id: String, offset: Int)
 
 
 class TrainingPipeline(sc: SparkContext) {
