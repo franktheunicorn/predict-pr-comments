@@ -62,32 +62,83 @@ index 01aa14b..8aa21e7 100644
     val results = PatchExtractor.processPatch(simpleInput)
     val expected = List(
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        172,173,
+        172,173, 4,
         "- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT",
         "README.md",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        34,35,
+        34,35, 4,
 	"	metadata := parseHTTPAddr(request)",
         "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        34,36,
+        34,36, 5,
         "	metadata.SourceIP = parseSourceIP(conn)",
         "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        36,37,
+        36,37, 7,
         "		metadata: parseHTTPAddr(request),",
         "adapters/inbound/http.go",
         false),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
-        36,38,
+        36,38, 8,
         "		metadata: metadata,",
         "adapters/inbound/http.go",
         true))
     results should contain theSameElementsAs expected
   }
+  val simpleDiffInput = """
+diff --git a/run_spark_data_process.sh b/run_spark_data_process.sh
+index bd71564..e0d635d 100755
+--- a/fuck/run_spark_data_process.sh
++++ b/fuck/run_spark_data_process.sh
+@@ -36,5 +36,5 @@ pushd $SPARK_HOME
+  --conf spark.rpc.askTimeout=300 \
+  --conf spark.locality.wait=2 \
+  $JAR \
+- $INPUT $OUTPUT $CACHE
++ $INPUT $OUTPUT $CACHE $ISSUES
+ popd
+diff --git a/rundev.sh b/rundev.sh
+index d272c48..d408ab2 100755
+--- a/rundev.sh
++++ b/rundev.sh
+@@ -6,22 +6,23 @@ gcloud container clusters get-credentials tigeycluster --zone us-central1-a --pr
+ # Upload the jar
+ ./upload_spark_jar.sh 
+ # Train the model
+-export APP_PREFIX="ml22a-gbt-withcv-test"
++export APP_PREFIX="ml23a-gbt-withcv-withissues-test"
+ export MEMORY_OVERHEAD_FRACTION=0.40
+ export SPARK_EXEC_MEMORY=35g
+"""
+  test("Simple diff input") {
+    val results = PatchExtractor.processPatch(simpleDiffInput)
+    val expected = List(
+      PatchRecord(null,
+        39,38, 4,
+        " $INPUT $OUTPUT $CACHE",
+        "fuck/run_spark_data_process.sh",
+        false),
+      PatchRecord(null,
+        39, 39, 5,
+	" $INPUT $OUTPUT $CACHE $ISSUES",
+        "fuck/run_spark_data_process.sh",
+        true),
+      PatchRecord(null,
+        9,8, 4,
+        "export APP_PREFIX=\"ml22a-gbt-withcv-test\"",
+        "rundev.sh",
+        false),
+      PatchRecord(null,
+        9,9, 5,
+        "export APP_PREFIX=\"ml23a-gbt-withcv-withissues-test\"",
+        "rundev.sh",
+        true))
+    results should contain theSameElementsAs expected
+  }
+
   val slightlyComplexInput = """
 From a7fbc74335c2df27002e8158f8e83a919195eed7 Mon Sep 17 00:00:00 2001
 From: Holden Karau <holden@pigscanfly.ca>
@@ -183,9 +234,15 @@ index 471b9e0a1a877..d9eff9f9b0ac1 100644
     numAdded should be (23)
     numRemoved should be (3)
     results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
-      399, 398,
+      399, 398, 4,
       "    // If the data is already approriately partioned with a known partioner we can work locally.",
       "core/src/main/scala/org/apache/spark/rdd/RDD.scala",
       false))
+    results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
+      399, 399, 5,
+      "    // If the data is already approriately partitioned with a known partitioner we can work locally.",
+      "core/src/main/scala/org/apache/spark/rdd/RDD.scala",
+      true))
+
   }
 }
