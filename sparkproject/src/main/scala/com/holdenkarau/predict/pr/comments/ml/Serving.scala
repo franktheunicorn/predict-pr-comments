@@ -83,15 +83,18 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     val elemsDF = session.createDataFrame(elems)
     val predictionsDF = model.transform(elemsDF)
     val positivePredictionsDF = predictionsDF.filter($"prediction" === 1.0).select(
-      $"filename", $"commented".cast("int").alias("line")).as[ModelTransformResult]
+      $"filename", $"offset".alias("line"), $"commit_id").as[ModelTransformResult]
     val positivePredictions = positivePredictionsDF.collect()
     val positivePredictionFP = positivePredictions.map(r =>
-      FileNameLinePair(r.filename, r.line))
+      FileNameCommitIDPosition(
+        r.filename,
+        r.commit_id.get,
+        r.line.get))
     GetCommentResponse(pullRequestURL, positivePredictionFP)
   }
 }
 
-case class ModelTransformResult(filename: String, line: Int)
+case class ModelTransformResult(filename: String, line: Option[Int], commit_id: Option[String])
 
 object ModelServingService {
   val issueDataLocation = "gs://frank-the-unicorn/issues-full"
