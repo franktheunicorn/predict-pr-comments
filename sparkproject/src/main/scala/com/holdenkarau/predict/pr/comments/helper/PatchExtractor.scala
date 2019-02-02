@@ -22,12 +22,13 @@ object PatchExtractor {
   /*
    * Process a given patch. You don't want to look inside this.
    */
-  def processPatch(patch: String): Seq[PatchRecord] = {
+  def processPatch(patch: String, diff: Boolean = false): Seq[PatchRecord] = {
     val lines = patch.split("\n")
     var commitId: String = null
     var filename: String = null
     var oldPos: Integer = null
     var newPos: Integer = null
+    var linesFromHeader: Integer = null
     var seenDiff: Boolean = false
     // Loop through the inputs
     lines.flatMap{line =>
@@ -37,6 +38,7 @@ object PatchExtractor {
           filename = f
           newPos = null
           oldPos = null
+          linesFromHeader = null
           None
         case indexRegex(idx, fileMode) =>
           // Do nothing
@@ -48,6 +50,7 @@ object PatchExtractor {
           filename = null
           oldPos = null
           newPos = null
+          linesFromHeader = null
           None
         case oldFilenameRegex(f) if seenDiff && newPos == null =>
           None
@@ -57,17 +60,29 @@ object PatchExtractor {
         case blockHeaderRegex(op, np) if seenDiff =>
           oldPos = op.toInt - 1
           newPos = np.toInt - 1
+          linesFromHeader = 0
           None
-        case addedLine(lineText) if seenDiff && newPos != null && lineText.length < 2000 =>
+        case addedLine(lineText) if seenDiff && newPos != null =>
+          linesFromHeader = linesFromHeader + 1
           newPos = newPos + 1
-          Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, true))
-        case removedLine(lineText) if seenDiff && newPos != null && lineText.length < 2000 =>
+          if (lineText.length < 2000) {
+            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, true))
+          } else {
+            None
+          }
+        case removedLine(lineText) if seenDiff && newPos != null  =>
+          linesFromHeader = linesFromHeader + 1
           oldPos = oldPos + 1
-          Some(PatchRecord(commitId, oldPos, newPos, lineText, filename, false))
+          if (lineText.length < 2000) {
+            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, false))
+          } else {
+            None
+          }
         case _ if seenDiff && newPos != null =>
           // Context line
           newPos = newPos + 1
           oldPos = oldPos + 1
+          linesFromHeader = linesFromHeader + 1
           None
         case _ =>
           // Not in diff/patch view

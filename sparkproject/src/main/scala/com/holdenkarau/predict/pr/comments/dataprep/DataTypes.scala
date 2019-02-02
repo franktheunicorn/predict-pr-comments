@@ -26,7 +26,7 @@ case class ResultData(
   comment_commit_ids: List[String],
   patch: String,
   diff: String)
-case class PatchRecord(commitId: String, oldPos: Int, newPos: Int, text: String,
-  filename: String, add: Boolean)
+case class PatchRecord(commitId: String, oldPos: Int, newPos: Int,
+  linesFromHeader: Option[Int], text: String, filename: String, add: Boolean)
 case class IssueInputRecord(name: String, url: String)
 case class IssueStackTrace(project: String, filename: String, line: Int)
