@@ -22,7 +22,7 @@ object PatchExtractor {
   /*
    * Process a given patch. You don't want to look inside this.
    */
-  def processPatch(patch: String): Seq[PatchRecord] = {
+  def processPatch(patch: String, diff: Boolean = false): Seq[PatchRecord] = {
     val lines = patch.split("\n")
     var commitId: String = null
     var filename: String = null

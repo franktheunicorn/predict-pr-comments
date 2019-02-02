@@ -143,16 +143,27 @@ object DataFetch {
   @transient implicit lazy val sttpBackend = AsyncHttpClientFutureBackend()
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  def fetchDiffForPatchUrl(patchUrl: String): Future[Response[String]] = {
+    val diffUrl = patchUrl.substring(0, patchUrl.length - 5) + "diff"
+    val diffRequest = sttp
+      .get(uri"${diffUrl}")
+    val diffResponseFuture = diffRequest.send()
+    diffResponseFuture
+  }
+
+  def fetchPatchAndDiffForURL(patchUrl: String): (Future[Response[String]], Future[Response[String]]) = {
+    val patchRequest = sttp
+      .get(uri"${patchUrl}")
+    val patchResponseFuture = patchRequest.send()
+    val diffResponseFuture = fetchDiffForPatchUrl(patchUrl)
+    (patchResponseFuture, diffResponseFuture)
+  }
+
   def fetchPatch(record: ParsedInputData):
       Future[(ParsedInputData, Response[String], Response[String])] = {
     try {
-      val patchRequest = sttp
-        .get(uri"${record.pull_patch_url}")
-      val patchResponseFuture = patchRequest.send()
-      val diffUrl = record.pull_patch_url.substring(0, record.pull_patch_url.length - 5) + "diff"
-      val diffRequest = sttp
-        .get(uri"${diffUrl}")
-      val diffResponseFuture = diffRequest.send()
+      val (patchResponseFuture, diffResponseFuture) = fetchPatchAndDiffForURL(record.pull_patch_url)
+
       val responseFuture = patchResponseFuture.zip(diffResponseFuture)
       responseFuture.map{case (patch, diff) => (record, patch, diff)}
     } catch {
