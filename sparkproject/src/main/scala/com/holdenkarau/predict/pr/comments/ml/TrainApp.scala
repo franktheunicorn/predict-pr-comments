@@ -17,6 +17,6 @@ private object MyRunner {
 
     val sc = new SparkContext(conf)
     val trainingPipeline = new TrainingPipeline(sc)
-    trainingPipeline.trainAndSaveModel(inputFile, outputFile, dataprepLocation, issueInput)
+    trainingPipeline.trainAndSaveModel(input=inputFile, output=outputFile, dataprepPipelineLocation=dataprepLocation, issueInput=issueInput)
   }
 }
