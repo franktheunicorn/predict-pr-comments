@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor"
 	"github.com/holdenk/predict-pr-comments/pull-request-suggester/webhookserver"
 	"github.com/kris-nova/logger"
 	"github.com/kris-nova/lolgopher"
@@ -23,15 +24,29 @@ import (
 	"os"
 )
 
+var (
+	hostname = ""
+	port     = ""
+)
+
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "pull-request-suggester",
+	Use:   "pull-request-processor",
 	Short: "HTTP server to serve as a webhook for Pull Request events",
 	Long:  `HTTP server to serve as a webhook for Pull Request events`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO handle errors
-		webhookserver.Register()
-		webhookserver.Serve()
+		err := webhookserver.Register()
+		if err != nil {
+			logger.Critical("Unable to register webhook server: %v", err)
+			os.Exit(69)
+		}
+		err = webhookserver.Serve(hostname, port)
+		if err != nil {
+			logger.Critical("Error from the webhook server: %v", err)
+			os.Exit(70)
+		}
+		logger.Always("Complete")
+		os.Exit(1)
 	},
 }
 
@@ -47,5 +62,6 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&logger.Fabulous, "fabulous", "f", false, "Toggle rainbow logs")
 	RootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
 	RootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
-
+	RootCmd.Flags().StringVarP(&hostname, "hostname", "h", "", "The hostname to use for the client to connect to the server")
+	RootCmd.Flags().StringVarP(&port, "port", "p", "777", "The port to use for the client to connect to the server")
 }

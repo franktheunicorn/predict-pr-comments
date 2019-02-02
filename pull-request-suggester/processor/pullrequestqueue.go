@@ -1,4 +1,4 @@
-package suggester
+package processor
 
 import (
 	"github.com/google/go-github/github"
