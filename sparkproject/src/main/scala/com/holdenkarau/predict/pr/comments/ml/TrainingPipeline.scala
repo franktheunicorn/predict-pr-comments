@@ -34,9 +34,10 @@ class TrainingPipeline(sc: SparkContext) {
   def trainAndSaveModel(input: String, issueInput: String, output: String, dataprepPipelineLocation: String) = {
     // TODO: Do this
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
+    val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
 
     val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
-    val issueInputData = session.read.format("parquet").schema(schema).load(issueInput).as[IssueStackTrace]
+    val issueInputData = session.read.format("parquet").schema(issueSchema).load(issueInput).as[IssueStackTrace]
     // Reparition the inputs
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
 

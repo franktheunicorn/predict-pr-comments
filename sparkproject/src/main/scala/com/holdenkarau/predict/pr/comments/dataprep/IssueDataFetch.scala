@@ -30,7 +30,7 @@ class IssueDataFetch(sc: SparkContext) {
     val rawInputData = loadInput(input)
     val inputData = rawInputData.as[IssueInputRecord]
 
-    val resultData = processInput(inputData)
+    val resultData = processInput(inputData).as[IssueStackTrace]
     resultData.repartition($"project").write
       .partitionBy("project")
       .format("parquet")
