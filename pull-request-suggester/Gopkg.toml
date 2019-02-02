@@ -26,20 +26,32 @@
 
 
 [[constraint]]
+  name = "github.com/golang/protobuf"
+  version = "1.2.0"
+
+[[constraint]]
   name = "github.com/google/go-github"
-  version = "21.0.0"
+  version = "22.0.0"
 
 [[constraint]]
   name = "github.com/gorilla/mux"
-  version = "1.6.2"
+  version = "1.7.0"
 
 [[constraint]]
   branch = "master"
   name = "github.com/kris-nova/logger"
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/kris-nova/lolgopher"
+
+[[constraint]]
   name = "github.com/spf13/cobra"
   version = "0.0.3"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
+  version = "1.18.0"
 
 [prune]
   go-tests = true

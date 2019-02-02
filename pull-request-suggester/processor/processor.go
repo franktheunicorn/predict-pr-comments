@@ -64,7 +64,7 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	go func() {
 		for {
 			event := Next()
-			logger.Info("Event recieved for PR: %s", event.Event.PullRequest.Title)
+			logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
 			response, err := modelClient.GetComment(context.TODO(), &suggester.GetCommentRequest{
 				PullRequestPatchURL: "",
 				PullRequestURL:      "",
