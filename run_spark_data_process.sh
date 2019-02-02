@@ -36,5 +36,5 @@ pushd $SPARK_HOME
  --conf spark.rpc.askTimeout=300 \
  --conf spark.locality.wait=2 \
  $JAR \
- $INPUT $OUTPUT $CACHE
+ $INPUT $OUTPUT $CACHE $ISSUES
 popd

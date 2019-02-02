@@ -18,29 +18,30 @@ import org.apache.spark.ml.classification._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
-import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, PatchRecord}
+import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, PatchRecord, IssueStackTrace}
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
-case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean)
-// LabeledRecord + extension and label and line length as a double for vector assembler
-case class PreparedData(text: String, filename: String, add: Boolean, commented: Boolean,
-  extension: String, line_length: Double, label: Double, only_spaces: Double)
+case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean, line: Int)
+// LabeledRecord - line + extension and label and line length as a double + found in issue
+case class PreparedData(text: String, filename: String, add: Boolean, commented: Double,
+  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double)
 
 
 class TrainingPipeline(sc: SparkContext) {
   val session = SparkSession.builder().getOrCreate()
   import session.implicits._
 
-  def trainAndSaveModel(input: String, output: String, dataprepPipelineLocation: String) = {
+  def trainAndSaveModel(input: String, issueInput: String, output: String, dataprepPipelineLocation: String) = {
     // TODO: Do this
     val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
 
     val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
+    val issueInputData = session.read.format("parquet").schema(schema).load(issueInput).as[IssueStackTrace]
     // Reparition the inputs
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
 
     val partitionedInputs = inputData.repartition(inputParallelism)
-    val (model, prScore, rocScore, datasetSize, positives) = trainAndEvalModel(partitionedInputs, dataprepPipelineLocation)
+    val (model, prScore, rocScore, datasetSize, positives) = trainAndEvalModel(partitionedInputs, issueInputData, dataprepPipelineLocation)
     model.write.save(s"$output/model")
     val cvSummary = model.stages.last match {
       case cvStage: CrossValidatorModel =>
@@ -57,18 +58,34 @@ class TrainingPipeline(sc: SparkContext) {
 
 
   // Produce data for training
-  def prepareTrainingData(input: Dataset[ResultData]): Dataset[PreparedData] = {
+  def prepareTrainingData(input: Dataset[ResultData],
+    issues: Dataset[IssueStackTrace]): Dataset[PreparedData] = {
+
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
+    val labeledWithEnd = labeledRecords.withColumn(
+      "endFileName", regexp_replace(labeledRecords("filename"), ".*/", ""))
+      .alias("labaeledRecords")
+    val issuesWithEnd = issues.withColumn(
+      "endFileName", regexp_replace(issues("filename"), ".*/", "")).
+      withColumn("pandas", lit("pandas"))
+      .alias("issues")
+
+    // Do an outer join on the file name and Issue stack trace
+    val recordsWithIssues = labeledWithEnd.join(issuesWithEnd,
+      usingColumns=List("endFileName", "line"), joinType="left_outer")
     // Extract the extension and cast the label
     val extractExtensionUDF = udf(TrainingPipeline.extractExtension _)
-    labeledRecords.withColumn(
-      "extension", extractExtensionUDF(labeledRecords("filename")))
+    recordsWithIssues.withColumn(
+      "extension", extractExtensionUDF($"labaeledRecords.filename"))
       .withColumn(
-        "label", labeledRecords("commented").cast("double"))
+        "label", $"commented".cast("double"))
       .withColumn(
-        "line_length", length(labeledRecords("text")).cast("double"))
+        "line_length", length($"text").cast("double"))
       .withColumn(
         "only_spaces", expr("""text rlike "^\s+$" """).cast("double"))
+      .withColumn(
+        "not_in_issues", isnull($"pandas").cast("double"))
+      .select($"text", $"labaeledRecords.filename", $"add", $"commented", $"extension", $"line_length", $"label", $"only_spaces", $"not_in_issues")
       .as[PreparedData]
   }
 
@@ -96,11 +113,13 @@ class TrainingPipeline(sc: SparkContext) {
   }
 
   def trainAndEvalModel(input: Dataset[ResultData],
+    issueInput: Dataset[IssueStackTrace],
     dataprepPipelineLocation: String,
     split: List[Double] = List(0.9, 0.1), fast: Boolean = false) = {
 
     input.cache()
-    val preparedInput = prepareTrainingData(input)
+    println("****PANDA***: dataset summary compute")
+    val preparedInput = prepareTrainingData(input, issueInput)
     val (datasetSize, positives) = preparedInput.select(
       count("*"), sum(preparedInput("label").cast("long")))
       .as[(Long, Long)]
@@ -109,9 +128,9 @@ class TrainingPipeline(sc: SparkContext) {
     val splits = input.randomSplit(split.toArray, seed=42)
     val train = splits(0)
     val test = splits(1)
-    val model = trainModel(train, dataprepPipelineLocation, fast)
+    val model = trainModel(train, issueInput, dataprepPipelineLocation, fast)
     println("****PANDA***: testing")
-    val testResult = model.transform(prepareTrainingData(test))
+    val testResult = model.transform(prepareTrainingData(test, issueInput))
     // We don't need as much data anymore :)
     train.unpersist(blocking = false)
     testResult.cache()
@@ -166,7 +185,8 @@ class TrainingPipeline(sc: SparkContext) {
           "only_spaces",
           "extension_index",
           //"tf_idf",
-          "line_length"))
+          "line_length",
+          "not_in_issues"))
         .setOutputCol("features")
 
 
@@ -192,9 +212,10 @@ class TrainingPipeline(sc: SparkContext) {
     model
   }
 
-  def trainModel(input: Dataset[ResultData], dataprepPipelineLocation: String,
+  def trainModel(input: Dataset[ResultData], issueInput: Dataset[IssueStackTrace],
+    dataprepPipelineLocation: String,
     fast: Boolean = false) = {
-    val preparedTrainingData = prepareTrainingData(input)
+    val preparedTrainingData = prepareTrainingData(input, issueInput)
     // Balanace the training data
     println("****PANDA***: balancing classes.")
     val balancedTrainingData = balanceClasses(preparedTrainingData)
@@ -275,7 +296,7 @@ object TrainingPipeline {
     val patchLines = PatchExtractor.processPatch(input.patch)
     val initialRecords = patchLines.map(patchRecord =>
       LabeledRecord(patchRecord.text, patchRecord.filename, patchRecord.add,
-        recordHasBeenCommentedOn(patchRecord))).distinct
+        recordHasBeenCommentedOn(patchRecord), patchRecord.oldPos)).distinct
     // The same text may show up in multiple places, if it's commented on in any of those
     // we want to tag it as commented. We could do this per file but per PR for now.
     val commentedRecords = initialRecords.filter(_.commented)
