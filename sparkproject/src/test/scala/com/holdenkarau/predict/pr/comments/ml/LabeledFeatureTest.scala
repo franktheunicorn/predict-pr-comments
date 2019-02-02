@@ -22,6 +22,6 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
     val labeledRecords = input.flatMap(TrainingPipeline.produceRecord)
     val localRecords = labeledRecords.collect()
     labeledRecords.filter($"commented" === true).collect() should contain (
-      LabeledRecord("	metadata.SourceIP = parseSourceIP(conn)","adapters/inbound/http.go",true,true))
+      LabeledRecord("	metadata.SourceIP = parseSourceIP(conn)","adapters/inbound/http.go",true,true, 34))
   }
 }
