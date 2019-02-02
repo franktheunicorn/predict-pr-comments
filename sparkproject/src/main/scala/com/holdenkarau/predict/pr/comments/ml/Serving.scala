@@ -13,6 +13,9 @@ import suggester.service.suggester._
 import com.holdenkarau.predict.pr.comments.sparkProject.dataprep._
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 import com.softwaremill.sttp.Response
+import java.util.logging.Logger
+import io.grpc.{Server, ServerBuilder}
+import scala.concurrent.ExecutionContext
 
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,16 +46,8 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     val patchRecords = PatchExtractor.processPatch(patch=patch, diff=false)
     val elems = patchRecords.map{record =>
       val extension = TrainingPipeline.extractExtension(record.filename).getOrElse(null)
-      val oldPos = if (record.oldPos == null) {
-        -1
-      } else {
-        record.oldPos
-      }
-      val newPos = if (record.newPos == null) {
-        -1
-      } else {
-        record.newPos
-      }
+      val oldPos = record.oldPos
+      val newPos = record.newPos
 
       val foundIssueCount = issueData
         .filter($"project" === repoName)
@@ -96,8 +91,39 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
 
 case class ModelTransformResult(filename: String, line: Option[Int], commit_id: Option[String])
 
+
+class ModelServingServer(executionContext: ExecutionContext) { self =>
+  private[this] var server: Server = null
+
+  def start(): Unit = {
+    val port = 777
+    server = ServerBuilder.forPort(port)
+      .addService(ModelRequestGrpc.bindService(new ModelServingService, executionContext)).build.start
+    ModelServingService.logger.info(s"Server started, listening on $port")
+    sys.addShutdownHook {
+      System.err.println("*** shutting down gRPC server since JVM is shutting down")
+      self.stop()
+      System.err.println("*** server shut down")
+    }
+  }
+
+  private def stop(): Unit = {
+    if (server != null) {
+      server.shutdown()
+    }
+  }
+
+  def blockUntilShutdown(): Unit = {
+    if (server != null) {
+      server.awaitTermination()
+    }
+  }
+}
+
+
 object ModelServingService {
   val issueDataLocation = "gs://frank-the-unicorn/issues-full"
   val pipelineLocation = "gs://frank-the-unicorn/full/ml-ml23a-gbt-withcv-withissues-test/model"
   val onlySpacesRegex = """^(\s+)$""".r
+  val logger = Logger.getLogger(classOf[ModelServingService].getName)
 }
