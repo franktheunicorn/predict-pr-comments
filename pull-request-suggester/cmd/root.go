@@ -25,13 +25,12 @@ import (
 )
 
 var (
-	hostname = ""
-	port     = ""
+	options = &processor.ClientOptions{}
 )
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "pull-request-processor",
+	Use:   "pull-request-suggester",
 	Short: "HTTP server to serve as a webhook for Pull Request events",
 	Long:  `HTTP server to serve as a webhook for Pull Request events`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -40,7 +39,17 @@ var RootCmd = &cobra.Command{
 			logger.Critical("Unable to register webhook server: %v", err)
 			os.Exit(69)
 		}
-		err = webhookserver.Serve(hostname, port)
+		// Start the Processor
+		go func() {
+			logger.Info("Starting frank process...")
+			err := processor.StartConcurrentProcessorClient(options)
+			if err != nil {
+				logger.Critical("Critical error with suggester: %v", err)
+				os.Exit(71)
+			}
+		}()
+		// Start the HTTP Webhook Server
+		err = webhookserver.Serve()
 		if err != nil {
 			logger.Critical("Error from the webhook server: %v", err)
 			os.Exit(70)
@@ -62,6 +71,8 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&logger.Fabulous, "fabulous", "f", false, "Toggle rainbow logs")
 	RootCmd.PersistentFlags().BoolVarP(&logger.Color, "color", "X", true, "Toggle colorized logs")
 	RootCmd.PersistentFlags().IntVarP(&logger.Level, "verbose", "v", 4, "Log level")
-	RootCmd.Flags().StringVarP(&hostname, "hostname", "h", "", "The hostname to use for the client to connect to the server")
-	RootCmd.Flags().StringVarP(&port, "port", "p", "777", "The port to use for the client to connect to the server")
+	RootCmd.Flags().StringVarP(&options.ModelServerHostname, "hostname", "b", "", "The hostname to use for the client to connect to the model server")
+	RootCmd.Flags().StringVarP(&options.ModelServerPort, "port", "p", "777", "The port to use for the client to connect to the model server")
+	RootCmd.Flags().StringVarP(&options.GithubClientUsername, "username", "u", "", "The username to use for the client for GitHub")
+	RootCmd.Flags().StringVarP(&options.GithubClientPassword, "password", "x", "", "The password to use for the client for GitHub")
 }

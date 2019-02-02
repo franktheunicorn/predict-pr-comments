@@ -17,6 +17,7 @@ var (
 	queuemutex = sync.Mutex{}
 )
 
+// RegisterRequest is used to drop a message in the queue
 func RegisterRequest(request *http.Request, event *github.PullRequestEvent) {
 	pre := &PullRequestEvent{
 		Request: request,
@@ -27,6 +28,8 @@ func RegisterRequest(request *http.Request, event *github.PullRequestEvent) {
 	queuemutex.Unlock()
 }
 
+// Next will return a message from the queue FIFO
+// If no message is in the queue, the function will hang
 func Next() *PullRequestEvent {
 	var nextEvent *PullRequestEvent
 	for {

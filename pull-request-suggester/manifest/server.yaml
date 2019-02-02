@@ -5,9 +5,9 @@ metadata:
     deployment.kubernetes.io/revision: "1"
   generation: 1
   labels:
-    run: pr-processor
-    app: pr-processor
-  name: pr-processor
+    run: pr-suggester
+    app: pr-suggester
+  name: pr-suggester
   namespace: nova
 spec:
   progressDeadlineSeconds: 600
@@ -15,7 +15,7 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      run: pr-processor
+      run: pr-suggester
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -25,12 +25,12 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
-        run: pr-processor
+        run: pr-suggester
     spec:
       containers:
-        - image: krisnova/pull-request-processor
+        - image: krisnova/pull-request-suggester
           imagePullPolicy: Always
-          name: pr-processor
+          name: pr-suggester
           resources: {}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
@@ -47,8 +47,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    run: pr-processor
-  name: pr-processor
+    run: pr-suggester
+  name: pr-suggester
   namespace: nova
 spec:
   ports:
@@ -56,7 +56,7 @@ spec:
       protocol: TCP
       targetPort: 80
   selector:
-    run: pr-processor
+    run: pr-suggester
   sessionAffinity: None
   type: ClusterIP
 status:
@@ -74,9 +74,9 @@ spec:
         paths:
           - path: /webhook
             backend:
-              serviceName: pr-processor
+              serviceName: pr-suggester
               servicePort: 80
           - path: /auth
             backend:
-              serviceName: pr-processor
+              serviceName: pr-suggester
               servicePort: 80

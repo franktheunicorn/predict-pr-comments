@@ -17,7 +17,7 @@ import (
 
 // Server options
 // Start server
-// Load processor and configure processor
+// Load suggester and configure suggester
 // Listen for events
 // Append to queue
 
@@ -33,16 +33,8 @@ func Register() error {
 	return nil
 }
 
-func Serve(grpcHost, grpcPort string) error {
-	go func() {
-		// Kick off Frank
-		logger.Info("Starting frank process...")
+func Serve() error {
 
-		processor.StartConcurrentProcessorClient(&processor.ClientOptions{
-			Hostname: grpcHost,
-			Port:     grpcPort,
-		})
-	}()
 	http.ListenAndServe(":80", router)
 	return nil
 }
