@@ -55,7 +55,14 @@ func Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	processor.RegisterRequest(r, &event)
+	if *event.Action == "opened" {
+		// Process Opened PR Events
+		logger.Info("Processing [opened] Pull Request: %s", *event.PullRequest.Title)
+		processor.RegisterRequest(r, &event)
+	} else {
+		logger.Info("Ignoring [%s] Pull Request: %s", *event.Action, *event.PullRequest.Title)
+	}
+
 	w.WriteHeader(200)
 	w.Write([]byte("200 Great Success!"))
 
