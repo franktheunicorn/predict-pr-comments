@@ -31,12 +31,17 @@ class IssueDataFetch(sc: SparkContext) {
     val inputData = rawInputData.as[IssueInputRecord]
 
     val resultData = processInput(inputData)
-    resultData.write.format("parquet").mode(SaveMode.Append).save(output)
+    resultData.repartition($"project").write
+      .partitionBy("project")
+      .format("parquet")
+      .mode(SaveMode.Overwrite)
+      .save(output)
   }
 
   def processInput(inputData: Dataset[IssueInputRecord]) = {
     val issues = inputData.mapPartitions(IssueDataFetch.fetchIssuesIterator)
     val resultData = issues.flatMap(IssueDataFetch.extractStackTraces)
+    resultData.distinct()
     resultData
   }
 
