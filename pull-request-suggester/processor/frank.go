@@ -6,9 +6,8 @@ import (
 )
 
 func GetFrankMessage() string {
-	gl := len(greeting)
 	sl := len(suspect)
-	gj := greeting[rand.GenerateRandomInt(0, gl)]
+	gj := greeting[rand.GenerateRandomInt(0, len(greeting))]
 	sj := suspect[rand.GenerateRandomInt(0, sl)]
 
 	return fmt.Sprintf("%s %s", gj, sj)
