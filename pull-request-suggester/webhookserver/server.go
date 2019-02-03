@@ -54,7 +54,11 @@ func Webhook(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
 		return
 	}
-
+	if event.Action == nil {
+		w.WriteHeader(500)
+		w.Write([]byte(fmt.Sprintf("500 Server Error: %v", err)))
+		return
+	}
 	if *event.Action == "opened" {
 		// Process Opened PR Events
 		logger.Info("Processing [opened] Pull Request: %s", *event.PullRequest.Title)
