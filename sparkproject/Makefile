@@ -41,7 +41,7 @@ deploy: ## Deploy to Kubernetes
 	. ./deploy.sh
 
 build: ## Compile the binary into /target
-	sbt assembly
+	sbt 'set test in assembly := {}' assembly
 
 push: ## Push to the docker registry
 	$(DOCKER) push $(REGISTRY)/$(TARGET):$(GIT_REF)

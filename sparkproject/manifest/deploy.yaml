@@ -31,7 +31,11 @@ spec:
         - image: krisnova/modelserver
           imagePullPolicy: Always
           name: model-server
-          resources: {}
+          resources:
+            limits:
+              memory: 30Gi
+            requests:
+              memory: 24Gi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           ports:
