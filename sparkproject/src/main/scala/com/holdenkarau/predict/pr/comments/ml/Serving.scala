@@ -27,6 +27,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     .format("org.apache.spark.sql.parquet") // Long name because assembly
     .schema(issueSchema).load(ModelServingService.issueDataLocation)
 
+  println(s"Loading model from $ModelServingService.pipelineLocation")
   val model = PipelineModel.load(ModelServingService.pipelineLocation)
 
   override def getComment(request: GetCommentRequest) = {
