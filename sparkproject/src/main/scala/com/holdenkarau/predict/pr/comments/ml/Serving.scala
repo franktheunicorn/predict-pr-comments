@@ -107,7 +107,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
       $"filename", $"offset".alias("line"), $"commit_id", $"probability", $"prediction").distinct()
     val distinctPredictions = positivePredictionsDF.groupBy(
       $"filename", $"line", $"commit_id").agg(
-        first("prediction").alais("prediction"),
+        first("prediction").alias("prediction"),
         first("probability").alias("probability"))
     // Try and limit how much help frank gives people
     val actionableResultsDF = distinctPredictions.sort(
