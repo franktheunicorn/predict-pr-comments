@@ -14,16 +14,18 @@ import com.holdenkarau.predict.pr.comments.sparkProject.dataprep._
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 import com.softwaremill.sttp.Response
 import java.util.logging.Logger
-import io.grpc.{Server, ServerBuilder}
+import io.grpc.{Server}
 import scala.concurrent.ExecutionContext
 
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
-  val session = SparkSession.builder().getOrCreate()
+  val session = SparkSession.builder().master("local[*]").getOrCreate()
   import session.implicits._
   val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
   // We don't strongly type here because of query push down fuzzyness
-  val issueData = session.read.format("parquet").schema(issueSchema).load(ModelServingService.issueDataLocation)
+  val issueData = session.read
+    .format("org.apache.spark.sql.parquet") // Long name because assembly
+    .schema(issueSchema).load(ModelServingService.issueDataLocation)
 
   val model = PipelineModel.load(ModelServingService.pipelineLocation)
 
@@ -97,7 +99,7 @@ class ModelServingServer(executionContext: ExecutionContext) { self =>
 
   def start(): Unit = {
     val port = 777
-    server = ServerBuilder.forPort(port)
+    server = io.grpc.netty.NettyServerBuilder.forPort(port)
       .addService(ModelRequestGrpc.bindService(new ModelServingService, executionContext)).build.start
     ModelServingService.logger.info(s"Server started, listening on $port")
     sys.addShutdownHook {
