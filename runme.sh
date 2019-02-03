@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -e
 set -x
 #APP_NAME=dev SPARK_DEFAULT_PARALLELISM=100 NUM_EXECS=10 ./run_spark_data_process.sh
