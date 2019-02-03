@@ -7,6 +7,7 @@ import (
 	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor/suggester"
 	"github.com/kris-nova/logger"
 	"google.golang.org/grpc"
+	"time"
 )
 
 const FrankMessageToChange = "Henllo fren. Looks like something funny here."
@@ -65,7 +66,12 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	go func() {
 		for {
 			state := modelServer.GetState()
-			logger.Always("Connect to gRPC state: %s", state.String())
+			if state.String() != "READY" {
+				logger.Always("Current gRPC state [%s]", state.String())
+				time.Sleep(time.Second * 1)
+				continue
+			}
+			logger.Always("Current gRPC state: %s", state.String())
 			event := Next()
 			logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
 			response, err := modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{
