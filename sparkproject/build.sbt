@@ -55,11 +55,14 @@ lazy val root = (project in file(".")).
     pomIncludeRepository := { x => false },
     mergeStrategy in assembly := {
       case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.concat
+      case m if m.toLowerCase.endsWith("services") => MergeStrategy.filterDistinctLines
       case m if m.toLowerCase.endsWith("git.properties") => MergeStrategy.discard
+      case m if m.toLowerCase.endsWith("reference.conf") => MergeStrategy.filterDistinctLines
         // Travis is giving a weird error on netty I don't see locally :(
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
       case PathList("META-INF", "native", xs @ _*) => MergeStrategy.deduplicate
+      case PathList("META-INF", "services", xs @ _ *) => MergeStrategy.filterDistinctLines
       case PathList("META-INF", xs @ _ *) => MergeStrategy.discard
       case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
       case PathList("org", "apache", xs @ _*) => MergeStrategy.last
