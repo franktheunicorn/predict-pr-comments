@@ -35,12 +35,16 @@ lazy val root = (project in file(".")).
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
 
+      //"com.thesamet.scalapb" %% "sparksql-scalapb" % "0.8.0",
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
       // for gRPC
-      "io.grpc"                %  "grpc-netty-shaded"           % "1.9.1",
+      "io.grpc"                %  "grpc-netty"           % "1.18.0",
       "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % com.trueaccord.scalapb.compiler.Version.scalapbVersion,
-      // Added so that we use netty 4.1.30 not trying to mix and match 2 different versions
-      "io.netty" % "netty-all" % "4.1.30.Final"
+      // Added so that we use netty 4.1.32 not trying to mix and match different versions
+      "io.netty" % "netty-all" % "4.1.32.Final",
+      "io.netty" % "netty-common" % "4.1.32.Final",
+      "io.netty" % "netty-resolver-dns" % "4.1.32.Final",
+      "io.netty" % "netty-transport-native-epoll" % "4.1.32.Final"
     ),
 
 
@@ -79,6 +83,9 @@ lazy val root = (project in file(".")).
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(m)
     },
+    assemblyShadeRules in assembly := Seq(
+      ShadeRule.rename("com.google.protobuf.**" -> "shadeproto.@1").inAll
+    ),
 
    resolvers ++= Seq(
       "sonatype-releases" at "https://oss.sonatype.org/content/repositories/releases/",
