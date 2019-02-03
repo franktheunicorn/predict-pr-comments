@@ -36,8 +36,8 @@ lazy val root = (project in file(".")).
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
 
       // Bring in hadoop 2.7.7 so new guava doesn't break the world
-      "org.apache.hadoop" % "hadoop-mapreduce-client-core" % 2.7.7,
-      "org.apache.hadoop" % "hadoop-common" % 2.7.7,
+      "org.apache.hadoop" % "hadoop-mapreduce-client-core" % "2.7.7",
+      "org.apache.hadoop" % "hadoop-common" % "2.7.7",
       //maybe commons io https://stackoverflow.com/questions/36427291/illegalaccesserror-to-guavas-stopwatch-from-org-apache-hadoop-mapreduce-lib-inp
       //"commons-io" % "common-io" % 2.7.7,
 
