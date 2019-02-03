@@ -19,5 +19,5 @@ ADD http://central.maven.org/maven2/com/google/guava/guava/23.0/guava-23.0.jar /
 ADD https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop2.jar /gcs-connector-latest-hadoop2.jar
 ADD http://apache.belnet.be/spark/spark-2.4.0/spark-2.4.0-bin-hadoop2.7.tgz /
 RUN tar -xvf /spark-2.4.0-bin-hadoop2.7.tgz
-RUN apk install libc6-compat
+RUN apk add libc6-compat
 ENTRYPOINT ["/usr/bin/java", "-cp", "/guava-23.0.jar:/gcs-connector-latest-hadoop2.jar:/spark-2.4.0-bin-hadoop2.7/jars:/spark-2.4.0-bin-hadoop2.7/jars/*:/app.jar", "com.holdenkarau.predict.pr.comments.sparkProject.ml.ServingApp"]
