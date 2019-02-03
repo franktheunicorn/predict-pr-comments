@@ -34,8 +34,10 @@ spec:
           resources:
             limits:
               memory: 30Gi
+              cpu: "90"
             requests:
               memory: 24Gi
+              cpu: "80"
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           ports:
