@@ -51,7 +51,8 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	defer modelServer.Close()
 	modelClient := suggester.NewModelRequestClient(modelServer)
 
-	//modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{})
+	state := modelServer.GetState()
+	logger.Always("Connect to gRPC state: %s", state.String())
 
 	//
 	//
