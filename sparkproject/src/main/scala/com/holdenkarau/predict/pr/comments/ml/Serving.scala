@@ -15,7 +15,7 @@ import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 import com.softwaremill.sttp.Response
 import java.util.logging.Logger
 import io.grpc.{Server}
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Future, ExecutionContext}
 
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,13 +32,19 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
 
   override def getComment(request: GetCommentRequest) = {
     System.err.println("*** Request kthnx")
-    ModelServingService.logger.info(s"Received request $request")
-    val pullRequestPatchURL = request.pullRequestPatchURL
-    val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
-    ModelServingService.logger.info(s"Patch future was $patchFuture")
-    val responseFuture = patchFuture.map(patch => predictOnResponse(request, patch))
-    ModelServingService.logger.info(s"Response future was $responseFuture")
-    responseFuture
+    try {
+      ModelServingService.logger.info(s"Received request $request")
+      val pullRequestPatchURL = request.pullRequestPatchURL
+      val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
+      ModelServingService.logger.info(s"Patch future was $patchFuture")
+      val responseFuture = patchFuture.map(patch => predictOnResponse(request, patch))
+      ModelServingService.logger.info(s"Response future was $responseFuture")
+      responseFuture
+    } catch {
+      case e: Exception =>
+        ModelServingService.logger.warning(s"Ran into an error during thing $e")
+        Future(GetCommentResponse(message=s"Frank fell down: $e ${e.toString}"))
+    }
   }
 
   def predictOnResponse(request: GetCommentRequest, patchResponse: Response[String]):
@@ -106,7 +112,9 @@ class ModelServingServer(executionContext: ExecutionContext) { self =>
   def start(): Unit = {
     val port = 777
     server = io.grpc.netty.NettyServerBuilder.forPort(port)
-      .addService(ModelRequestGrpc.bindService(new ModelServingService, executionContext)).build.start
+      .addService(
+        ModelRequestGrpc.bindService(new ModelServingService, executionContext))
+      .build.start
     ModelServingService.logger.info(s"Server started, listening on $port")
     sys.addShutdownHook {
       System.err.println("*** shutting down gRPC server since JVM is shutting down")
