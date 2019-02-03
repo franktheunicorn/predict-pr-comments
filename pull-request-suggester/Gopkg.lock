@@ -72,6 +72,14 @@
   revision = "313b3abb0d9bb53e3c43230132061a7a9cb100fc"
 
 [[projects]]
+  branch = "master"
+  digest = "1:b2682255126f2d4a0b9529e9b47a1658299599ce0c22886bccb11fa1961f787f"
+  name = "github.com/kubicorn/kubicorn"
+  packages = ["pkg/rand"]
+  pruneopts = "UT"
+  revision = "19c20c17bec7198957ce49d824efb5d40889ee68"
+
+[[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
   name = "github.com/mattn/go-colorable"
   packages = ["."]
@@ -206,6 +214,7 @@
     "github.com/gorilla/mux",
     "github.com/kris-nova/logger",
     "github.com/kris-nova/lolgopher",
+    "github.com/kubicorn/kubicorn/pkg/rand",
     "github.com/spf13/cobra",
     "google.golang.org/grpc",
   ]

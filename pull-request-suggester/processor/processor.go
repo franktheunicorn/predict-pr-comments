@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/go-github/github"
-	"github.com/holdenk/predict-pr-comments/frank"
 	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor/suggester"
 	"github.com/kris-nova/logger"
 	"google.golang.org/grpc"
@@ -71,7 +70,6 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 			PullRequestURL:      *event.Event.PullRequest.URL,
 			RepoName:            *event.Event.Repo.Name,
 		})
-		logger.Always("%+v")
 		if err != nil {
 			logger.Warning("Error from gRPC server: %v", err)
 			continue
@@ -84,7 +82,7 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 			repo := event.Event.Repo.Name
 			prNumber := event.Event.PullRequest.Number
 			_, _, err := githubClient.PullRequests.CreateComment(context.Background(), *owner, *repo, *prNumber, &github.PullRequestComment{
-				Body:     s(frank.GetMessage()),
+				Body:     s(GetFrankMessage()),
 				Path:     s(f.FileName),
 				CommitID: s(f.CommitID),
 				Position: i(int(f.Position)),
@@ -93,7 +91,7 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 				logger.Warning("Unable to leave comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
 				continue
 			}
-			logger.Info("Frank left comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
+			logger.Info("Frank left comment on PR: %v File: %s CommitID: %s Position: %d", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position)
 		}
 	}
 
