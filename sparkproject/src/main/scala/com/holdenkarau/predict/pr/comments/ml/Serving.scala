@@ -19,7 +19,7 @@ import scala.concurrent.{Future, ExecutionContext}
 
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
-  val session = SparkSession.builder().master("local[*]").getOrCreate()
+  val session = SparkSession.builder().master("local[2]").getOrCreate()
   import session.implicits._
   val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
   // We don't strongly type here because of query push down fuzzyness
@@ -116,6 +116,7 @@ class ModelServingServer(executionContext: ExecutionContext) { self =>
         ModelRequestGrpc.bindService(new ModelServingService, executionContext))
       .build.start
     ModelServingService.logger.info(s"Server started, listening on $port")
+    ModelServingService.logger.info(s"Server is $server")
     sys.addShutdownHook {
       System.err.println("*** shutting down gRPC server since JVM is shutting down")
       self.stop()
