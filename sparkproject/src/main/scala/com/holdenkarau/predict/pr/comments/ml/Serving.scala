@@ -31,10 +31,13 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
   val model = PipelineModel.load(ModelServingService.pipelineLocation)
 
   override def getComment(request: GetCommentRequest) = {
-    System.err.println("*** Request kthnx")
+    System.err.println("pandaerr Request kthnx")
+    System.out.println("panda Request kthnx")
+    System.out.println("panda Request request")
     try {
-      ModelServingService.logger.info(s"Received request $request")
+      ModelServingService.logger.info(s"panda Received request $request")
       val pullRequestPatchURL = request.pullRequestPatchURL
+      ModelServingService.logger.info(s"panda using patchURL $pullRequestPatchURL")
       val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
       ModelServingService.logger.info(s"Patch future was $patchFuture")
       val responseFuture = patchFuture.map(patch => predictOnResponse(request, patch))
@@ -53,11 +56,14 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     //if (diffResponse.code == StatusCodes.Ok) {
     //}
     val patch = patchResponse.unsafeBody
+
     predictOnPatch(request.repoName, request.pullRequestURL, patch)
   }
 
   def predictOnPatch(repoName: String, pullRequestURL: String, patch: String) = {
+    ModelServingService.logger.info(s"panda predicting on, $repoName $pullRequestURL $patch")
     val patchRecords = PatchExtractor.processPatch(patch=patch, diff=false)
+    ModelServingService.logger.info(s"panda had records $patchRecords")
     val elems = patchRecords.map{record =>
       val extension = TrainingPipeline.extractExtension(record.filename).getOrElse(null)
       val oldPos = record.oldPos
