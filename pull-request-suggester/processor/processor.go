@@ -70,7 +70,6 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 			PullRequestURL:      *event.Event.PullRequest.URL,
 			RepoName:            *event.Event.Repo.Name,
 		})
-		logger.Always("%+v")
 		if err != nil {
 			logger.Warning("Error from gRPC server: %v", err)
 			continue
