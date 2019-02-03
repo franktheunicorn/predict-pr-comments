@@ -75,7 +75,15 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 			continue
 		}
 		// Hooray we have a result back from the model
+		var cache []string
 		for _, f := range response.FileNameCommitIDPositions {
+			uniqkey := fmt.Sprintf("%s%s%d", f.CommitID, f.FileName, f.Position)
+			if !in(cache, uniqkey) {
+				cache = append(cache, uniqkey)
+			} else {
+				continue
+			}
+
 			// ------------------------------------------------------------------------
 			// This system will actually make the comment in GitHub!
 			owner := event.Event.Repo.Owner.Login
@@ -97,6 +105,15 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 
 	return nil
 
+}
+
+func in(strs []string, str string) bool {
+	for _, s := range strs {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
 
 func s(s string) *string {
