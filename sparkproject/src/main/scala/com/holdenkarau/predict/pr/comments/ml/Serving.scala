@@ -110,8 +110,9 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
         first("prediction").alias("prediction"),
         first("probability").alias("probability"))
     // Try and limit how much help frank gives people
-    val actionableResultsDF = distinctPredictions.sort(
-      expr("""element_at(probability, 1)""").desc).limit(5)
+    val actionableResultsDF = distinctPredictions
+      //.sort( expr("""element_at(probability, 1)""").desc)
+      .limit(7)
       .select($"filename", $"line", $"commit_id")
       .as[ModelTransformResult]
     actionableResultsDF.show()
