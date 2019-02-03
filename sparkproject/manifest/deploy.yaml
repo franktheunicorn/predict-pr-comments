@@ -31,8 +31,6 @@ spec:
         - image: krisnova/modelserver
           imagePullPolicy: Always
           name: model-server
-          command: ["/"]
-          args: ["HOSTNAME", "KUBERNETES_PORT"]
           resources:
             limits:
               memory: 30Gi
