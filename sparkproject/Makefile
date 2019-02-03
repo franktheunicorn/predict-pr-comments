@@ -53,7 +53,7 @@ clean: ## Clean the docker images
 
 container: ## Build the docker container
 	$(DOCKER) build \
-	    -f Dockerfile.grpcserver \
+	    -f Dockerfile.modelserver \
 		-t $(REGISTRY)/$(TARGET):$(GIT_REF) \
 	    -t $(REGISTRY)/$(TARGET):latest \
 		.
