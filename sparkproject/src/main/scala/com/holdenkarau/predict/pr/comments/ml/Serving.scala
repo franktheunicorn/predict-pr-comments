@@ -63,7 +63,6 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
   def predictOnPatch(repoName: String, pullRequestURL: String, patch: String) = {
     ModelServingService.logger.info(s"panda predicting on, $repoName $pullRequestURL $patch")
     val patchRecords = PatchExtractor.processPatch(patch=patch, diff=false)
-    ModelServingService.logger.info(s"panda had records $patchRecords")
     val elems = patchRecords.map{record =>
       val extension = TrainingPipeline.extractExtension(record.filename).getOrElse(null)
       val oldPos = record.oldPos
@@ -96,16 +95,22 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
       )
     }
     val elemsDF = session.createDataFrame(elems)
+    elemsDF.show()
     val predictionsDF = model.transform(elemsDF)
+    predictionsDF.show()
     val positivePredictionsDF = predictionsDF.filter($"prediction" === 1.0).select(
-      $"filename", $"offset".alias("line"), $"commit_id").as[ModelTransformResult]
-    val positivePredictions = positivePredictionsDF.collect()
-    val positivePredictionFP = positivePredictions.map(r =>
+      $"filename", $"offset".alias("line"), $"commit_id").distinct()
+      .as[ModelTransformResult]
+    // Try and limit how much help frank gives people
+    val actionableResultsDF = positivePredictionsDF.sort(
+      expr("""element_at(probability, 1)""").desc).limit(5)
+    val predictions = actionableResultsDF.collect()
+    val predictionFP = predictions.map(r =>
       FileNameCommitIDPosition(
         r.filename,
         r.commit_id.get,
         r.line.get))
-    GetCommentResponse(pullRequestURL, positivePredictionFP)
+    GetCommentResponse(pullRequestURL, predictionFP)
   }
 }
 
