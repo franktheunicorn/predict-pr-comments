@@ -25,8 +25,8 @@ lazy val root = (project in file(".")).
     coverageHighlighting := true,
 
     libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-sql" % sparkVersion,
-      "org.apache.spark" %% "spark-mllib" % sparkVersion,
+      "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+      "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
       "com.github.marklister" %% "product-collections" % "1.4.5",
@@ -36,8 +36,8 @@ lazy val root = (project in file(".")).
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
 
       // Bring in hadoop 2.7.7 so new guava doesn't break the world
-      "org.apache.hadoop" % "hadoop-mapreduce-client-core" % "2.7.7",
-      "org.apache.hadoop" % "hadoop-common" % "2.7.7",
+      //"org.apache.hadoop" % "hadoop-mapreduce-client-core" % "2.7.7",
+      //"org.apache.hadoop" % "hadoop-common" % "2.7.7",
       //maybe commons io https://stackoverflow.com/questions/36427291/illegalaccesserror-to-guavas-stopwatch-from-org-apache-hadoop-mapreduce-lib-inp
       //"commons-io" % "common-io" % 2.7.7,
 
