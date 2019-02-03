@@ -51,9 +51,6 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	defer modelServer.Close()
 	modelClient := suggester.NewModelRequestClient(modelServer)
 
-	state := modelServer.GetState()
-	logger.Always("Connect to gRPC state: %s", state.String())
-
 	//
 	//
 	//
@@ -67,6 +64,8 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	//
 	go func() {
 		for {
+			state := modelServer.GetState()
+			logger.Always("Connect to gRPC state: %s", state.String())
 			event := Next()
 			logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
 			response, err := modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{
