@@ -17,8 +17,13 @@ import java.util.logging.Logger
 import io.grpc.{Server}
 import scala.concurrent.{Future, ExecutionContext}
 
+// Logging
+import org.apache.log4j.{Logger => Log4jLogger}
+import org.apache.log4j.Level
+
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
+  Log4jLogger.getLogger("org").setLevel(Level.OFF)
   val session = SparkSession.builder().master("local[2]").getOrCreate()
   import session.implicits._
   val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
@@ -108,12 +113,14 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
       expr("""element_at(probability, 1)""").desc).limit(5)
       .select($"filename", $"offset".alias("line"), $"commit_id")
       .as[ModelTransformResult]
+    actionableResultsDF.show()
     val predictions = actionableResultsDF.collect()
     val predictionFP = predictions.map(r =>
       FileNameCommitIDPosition(
         r.filename,
         r.commit_id.get,
         r.line.get))
+    println(s"Asking frank to tell folks about  $predictions")
     GetCommentResponse(pullRequestURL, predictionFP)
   }
 }
