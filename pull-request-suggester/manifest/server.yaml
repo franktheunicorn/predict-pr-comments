@@ -37,7 +37,7 @@ spec:
           ports:
             - containerPort: 80
           command: ["/go/bin/prs"]
-          args: ["--hostname", "", "--port", "777", "--username", "frank-theunicorn", "--password", "tigeyboo1"]
+          args: ["--hostname", "model-server", "--port", "777", "--username", "frank-theunicorn", "--password", "tigeyboo1"]
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
