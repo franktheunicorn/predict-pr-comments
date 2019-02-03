@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM openjdk:latest
+FROM openjdk:8-jdk-alpine
 COPY target/scala-2.11/sparkProject-assembly-0.0.1.jar /app.jar
 WORKDIR /
 ADD http://central.maven.org/maven2/com/google/guava/guava/23.0/guava-23.0.jar /guava-23.0.jar
