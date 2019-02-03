@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/go-github/github"
+	"github.com/holdenk/predict-pr-comments/frank"
 	"github.com/holdenk/predict-pr-comments/pull-request-suggester/processor/suggester"
 	"github.com/kris-nova/logger"
 	"google.golang.org/grpc"
-	"time"
 )
-
-const FrankMessageToChange = "Henllo fren. Looks like something funny here."
 
 type ClientOptions struct {
 
@@ -63,47 +61,42 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	// This System will run the basic frank processer service in a concurrent
 	// goroutine
 	//
-	go func() {
-		for {
-			state := modelServer.GetState()
-			if state.String() != "READY" {
-				logger.Always("Current gRPC state [%s]", state.String())
-				time.Sleep(time.Second * 1)
-				continue
-			}
-			logger.Always("Current gRPC state: %s", state.String())
-			event := Next()
-			logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
-			response, err := modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{
-				PullRequestPatchURL: *event.Event.PullRequest.PatchURL,
-				PullRequestURL:      *event.Event.PullRequest.URL,
-				RepoName:            *event.Event.Repo.Name,
+	state := modelServer.GetState()
+	for {
+		logger.Always("Current gRPC state: %s", state.String())
+		event := Next()
+		logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
+		response, err := modelClient.GetComment(context.TODO(), &suggester.GetCommentRequest{
+			PullRequestPatchURL: *event.Event.PullRequest.PatchURL,
+			PullRequestURL:      *event.Event.PullRequest.URL,
+			RepoName:            *event.Event.Repo.Name,
+		})
+		logger.Always("%+v")
+		if err != nil {
+			logger.Warning("Error from gRPC server: %v", err)
+			continue
+		}
+		// Hooray we have a result back from the model
+		for _, f := range response.FileNameCommitIDPositions {
+			// ------------------------------------------------------------------------
+			// This system will actually make the comment in GitHub!
+			owner := event.Event.Repo.Owner.Login
+			repo := event.Event.Repo.Name
+			prNumber := event.Event.PullRequest.Number
+			_, _, err := githubClient.PullRequests.CreateComment(context.Background(), *owner, *repo, *prNumber, &github.PullRequestComment{
+				Body:     s(frank.GetMessage()),
+				Path:     s(f.FileName),
+				CommitID: s(f.CommitID),
+				Position: i(int(f.Position)),
 			})
 			if err != nil {
-				logger.Warning("Error from gRPC server: %v", err)
+				logger.Warning("Unable to leave comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
 				continue
 			}
-			// Hooray we have a result back from the model
-			for _, f := range response.FileNameCommitIDPositions {
-				// ------------------------------------------------------------------------
-				// This system will actually make the comment in GitHub!
-				owner := event.Event.Repo.Owner.Login
-				repo := event.Event.Repo.Name
-				prNumber := event.Event.PullRequest.Number
-				_, _, err := githubClient.PullRequests.CreateComment(context.Background(), *owner, *repo, *prNumber, &github.PullRequestComment{
-					Body:     s(FrankMessageToChange),
-					Path:     s(f.FileName),
-					CommitID: s(f.CommitID),
-					Position: i(int(f.Position)),
-				})
-				if err != nil {
-					logger.Warning("Unable to leave comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
-					continue
-				}
-				logger.Info("Frank left comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
-			}
+			logger.Info("Frank left comment on PR: %v File: %s CommitID: %s Position: %d with error: %v", event.Event.PullRequest.Title, f.FileName, f.CommitID, f.Position, err)
 		}
-	}()
+	}
+
 	return nil
 
 }
