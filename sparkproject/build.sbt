@@ -35,6 +35,12 @@ lazy val root = (project in file(".")).
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
 
+      // Bring in hadoop 2.7.7 so new guava doesn't break the world
+      "org.apache.hadoop" % "hadoop-mapreduce-client-core" % 2.7.7,
+      "org.apache.hadoop" % "hadoop-common" % 2.7.7,
+      //maybe commons io https://stackoverflow.com/questions/36427291/illegalaccesserror-to-guavas-stopwatch-from-org-apache-hadoop-mapreduce-lib-inp
+      //"commons-io" % "common-io" % 2.7.7,
+
       //"com.thesamet.scalapb" %% "sparksql-scalapb" % "0.8.0",
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
       // for gRPC
