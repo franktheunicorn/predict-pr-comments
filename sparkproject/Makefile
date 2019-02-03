@@ -16,7 +16,7 @@ ifndef VERBOSE
 	MAKEFLAGS += --silent
 endif
 
-TARGET = sparkproject
+TARGET = modelserver
 GOTARGET = github.com/holdenk/predict-pr-comments/modelserver
 REGISTRY ?= krisnova
 IMAGE = $(REGISTRY)/$(TARGET)
