@@ -65,7 +65,11 @@ func Webhook(w http.ResponseWriter, r *http.Request) {
 		processor.RegisterRequest(r, &event)
 	} else {
 		if event.Action != nil {
-			logger.Info("Ignoring [%s] Pull Request: %s", *event.Action, *event.PullRequest.Title)
+			if event.Action == nil || event.PullRequest == nil || event.PullRequest.Title == nil {
+
+			} else {
+				logger.Info("Ignoring [%s] Pull Request: %s", *event.Action, *event.PullRequest.Title)
+			}
 		}
 	}
 
