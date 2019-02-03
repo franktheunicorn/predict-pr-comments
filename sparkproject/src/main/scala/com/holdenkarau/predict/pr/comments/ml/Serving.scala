@@ -17,8 +17,13 @@ import java.util.logging.Logger
 import io.grpc.{Server}
 import scala.concurrent.{Future, ExecutionContext}
 
+// Logging
+import org.apache.log4j.{Logger => Log4jLogger}
+import org.apache.log4j.Level
+
 class ModelServingService extends ModelRequestGrpc.ModelRequest {
   import scala.concurrent.ExecutionContext.Implicits.global
+  Log4jLogger.getLogger("org").setLevel(Level.OFF)
   val session = SparkSession.builder().master("local[2]").getOrCreate()
   import session.implicits._
   val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
@@ -99,21 +104,25 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     val predictionsDF = model.transform(elemsDF)
     predictionsDF.show()
     val positivePredictionsDF = predictionsDF.filter($"prediction" === 1.0).select(
-      $"filename", $"offset".alias("line"), $"commit_id", $"probability").distinct()
+      $"filename", $"offset".alias("line"), $"commit_id", $"probability", $"prediction").distinct()
     val distinctPredictions = positivePredictionsDF.groupBy(
       $"filename", $"line", $"commit_id").agg(
-      first("prediction"), first("probablity"))
+        first("prediction").alias("prediction"),
+        first("probability").alias("probability"))
     // Try and limit how much help frank gives people
-    val actionableResultsDF = positivePredictionsDF.sort(
-      expr("""element_at(probability, 1)""").desc).limit(5)
-      .select($"filename", $"offset".alias("line"), $"commit_id")
+    val actionableResultsDF = distinctPredictions
+      //.sort( expr("""element_at(probability, 1)""").desc)
+      .limit(7)
+      .select($"filename", $"line", $"commit_id")
       .as[ModelTransformResult]
+    actionableResultsDF.show()
     val predictions = actionableResultsDF.collect()
     val predictionFP = predictions.map(r =>
       FileNameCommitIDPosition(
         r.filename,
         r.commit_id.get,
         r.line.get))
+    println(s"Asking frank to tell folks about  $predictions")
     GetCommentResponse(pullRequestURL, predictionFP)
   }
 }
