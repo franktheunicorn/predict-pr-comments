@@ -38,7 +38,8 @@ object PatchExtractor {
           filename = f
           newPos = null
           oldPos = null
-          linesFromHeader = null
+          // See https://developer.github.com/v3/pulls/comments/#create-a-comment
+          linesFromHeader = -1
           None
         case indexRegex(idx, fileMode) =>
           // Do nothing
@@ -60,7 +61,8 @@ object PatchExtractor {
         case blockHeaderRegex(op, np) if seenDiff =>
           oldPos = op.toInt - 1
           newPos = np.toInt - 1
-          linesFromHeader = 0
+          // Complicated
+          linesFromHeader = linesFromHeader + 1
           None
         case addedLine(lineText) if seenDiff && newPos != null =>
           linesFromHeader = linesFromHeader + 1
