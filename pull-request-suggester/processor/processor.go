@@ -51,7 +51,7 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	defer modelServer.Close()
 	modelClient := suggester.NewModelRequestClient(modelServer)
 
-	modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{})
+	//modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{})
 
 	//
 	//
