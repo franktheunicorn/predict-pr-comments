@@ -25,8 +25,8 @@ lazy val root = (project in file(".")).
     coverageHighlighting := true,
 
     libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-sql" % sparkVersion,
-      "org.apache.spark" %% "spark-mllib" % sparkVersion,
+      "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+      "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
       "com.softwaremill.sttp" %% "core" % "1.5.4",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.5.4",
       "com.github.marklister" %% "product-collections" % "1.4.5",
@@ -34,6 +34,12 @@ lazy val root = (project in file(".")).
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "com.holdenkarau" %% "spark-testing-base" % "2.4.0_0.11.0" % "test",
+
+      // Bring in hadoop 2.7.7 so new guava doesn't break the world
+      //"org.apache.hadoop" % "hadoop-mapreduce-client-core" % "2.7.7",
+      //"org.apache.hadoop" % "hadoop-common" % "2.7.7",
+      //maybe commons io https://stackoverflow.com/questions/36427291/illegalaccesserror-to-guavas-stopwatch-from-org-apache-hadoop-mapreduce-lib-inp
+      //"commons-io" % "common-io" % 2.7.7,
 
       //"com.thesamet.scalapb" %% "sparksql-scalapb" % "0.8.0",
       "com.trueaccord.scalapb" %% "scalapb-runtime"      % com.trueaccord.scalapb.compiler.Version.scalapbVersion % "protobuf",
@@ -55,11 +61,14 @@ lazy val root = (project in file(".")).
     pomIncludeRepository := { x => false },
     mergeStrategy in assembly := {
       case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case m if m.toLowerCase.endsWith("io.netty.versions.properties") => MergeStrategy.concat
+      case m if m.toLowerCase.endsWith("services") => MergeStrategy.filterDistinctLines
       case m if m.toLowerCase.endsWith("git.properties") => MergeStrategy.discard
+      case m if m.toLowerCase.endsWith("reference.conf") => MergeStrategy.filterDistinctLines
         // Travis is giving a weird error on netty I don't see locally :(
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
       case PathList("META-INF", "native", xs @ _*) => MergeStrategy.deduplicate
+      case PathList("META-INF", "services", xs @ _ *) => MergeStrategy.filterDistinctLines
       case PathList("META-INF", xs @ _ *) => MergeStrategy.discard
       case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
       case PathList("org", "apache", xs @ _*) => MergeStrategy.last
