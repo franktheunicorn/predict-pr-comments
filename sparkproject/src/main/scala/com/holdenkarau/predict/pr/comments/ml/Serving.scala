@@ -31,9 +31,14 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
   val model = PipelineModel.load(ModelServingService.pipelineLocation)
 
   override def getComment(request: GetCommentRequest) = {
+    System.err.println("*** Request kthnx")
+    ModelServingService.logger.info(s"Received request $request")
     val pullRequestPatchURL = request.pullRequestPatchURL
     val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
-    patchFuture.map(patch => predictOnResponse(request, patch))
+    ModelServingService.logger.info(s"Patch future was $patchFuture")
+    val responseFuture = patchFuture.map(patch => predictOnResponse(request, patch))
+    ModelServingService.logger.info(s"Response future was $responseFuture")
+    responseFuture
   }
 
   def predictOnResponse(request: GetCommentRequest, patchResponse: Response[String]):
