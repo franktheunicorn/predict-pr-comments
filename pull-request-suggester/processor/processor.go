@@ -50,6 +50,9 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 	}
 	defer modelServer.Close()
 	modelClient := suggester.NewModelRequestClient(modelServer)
+
+	modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{})
+
 	//
 	//
 	//
@@ -65,10 +68,10 @@ func StartConcurrentProcessorClient(opt *ClientOptions) error {
 		for {
 			event := Next()
 			logger.Info("Event recieved for PR: %s", *event.Event.PullRequest.Title)
-			response, err := modelClient.GetComment(context.TODO(), &suggester.GetCommentRequest{
-				PullRequestPatchURL: "",
-				PullRequestURL:      "",
-				RepoName:            "",
+			response, err := modelClient.GetComment(context.Background(), &suggester.GetCommentRequest{
+				PullRequestPatchURL: *event.Event.PullRequest.PatchURL,
+				PullRequestURL:      *event.Event.PullRequest.URL,
+				RepoName:            *event.Event.Repo.Name,
 			})
 			if err != nil {
 				logger.Warning("Error from gRPC server: %v", err)
