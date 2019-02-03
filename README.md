@@ -1,2 +1,2 @@
 # predict-pr-comments
-[WIP] Predict comments on PRs
+Predict comments on PRs
