@@ -18,13 +18,37 @@ import org.apache.spark.ml.classification._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
-import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{ResultData, PatchRecord, IssueStackTrace}
+import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{
+  PatchRecord, ParsedCommentInputData, IssueStackTrace}
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
-case class LabeledRecord(text: String, filename: String, add: Boolean, commented: Boolean, line: Int, commit_id: Option[String]=None, offset: Option[Int]=None)
+case class LabeledRecord(
+  previousLines: Array[String],
+  lineText: String,
+  nextLines: Array[String],
+  filename: String,
+  add: Boolean,
+  lineCommented: Boolean,
+  line: Int,
+  commit_id: Option[String]=None,
+  offset: Option[Int]=None)
 // LabeledRecord - line + extension and label and line length as a double + found in issue
-case class PreparedData(text: String, filename: String, add: Boolean, commented: Double,
-  extension: String, line_length: Double, label: Double, only_spaces: Double, not_in_issues: Double, commit_id: Option[String]=None, offset: Option[Int]=None)
+case class PreparedData(
+  previousLines: Array[String],
+  lineText: String,
+  nextLines: Array[String],
+  previousTextTokenized: Array[String],
+  lineTextTokenized: Array[String],
+  filename: String,
+  add: Boolean,
+  commented: Double,
+  extension: String,
+  line_length: Double,
+  label: Double,
+  only_spaces: Double,
+  not_in_issues: Double,
+  commit_id: Option[String]=None,
+  offset: Option[Int]=None)
 
 
 class TrainingPipeline(sc: SparkContext) {
@@ -33,10 +57,10 @@ class TrainingPipeline(sc: SparkContext) {
 
   def trainAndSaveModel(input: String, issueInput: String, output: String, dataprepPipelineLocation: String) = {
     // TODO: Do this
-    val schema = ScalaReflection.schemaFor[ResultData].dataType.asInstanceOf[StructType]
+    val schema = ScalaReflection.schemaFor[ParsedCommentInputData].dataType.asInstanceOf[StructType]
     val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
 
-    val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultData]
+    val inputData = session.read.format("parquet").schema(schema).load(input).as[ParsedCommentInputData]
     val issueInputData = session.read.format("parquet").schema(issueSchema).load(issueInput).as[IssueStackTrace]
     // Reparition the inputs
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
@@ -59,7 +83,7 @@ class TrainingPipeline(sc: SparkContext) {
 
 
   // Produce data for training
-  def prepareTrainingData(input: Dataset[ResultData],
+  def prepareTrainingData(input: Dataset[ParsedCommentInputData],
     issues: Dataset[IssueStackTrace]): Dataset[PreparedData] = {
 
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
@@ -113,7 +137,7 @@ class TrainingPipeline(sc: SparkContext) {
     result
   }
 
-  def trainAndEvalModel(input: Dataset[ResultData],
+  def trainAndEvalModel(input: Dataset[ParsedCommentInputData],
     issueInput: Dataset[IssueStackTrace],
     dataprepPipelineLocation: String,
     split: List[Double] = List(0.9, 0.1), fast: Boolean = false) = {
@@ -213,7 +237,7 @@ class TrainingPipeline(sc: SparkContext) {
     model
   }
 
-  def trainModel(input: Dataset[ResultData], issueInput: Dataset[IssueStackTrace],
+  def trainModel(input: Dataset[ParsedCommentInputData], issueInput: Dataset[IssueStackTrace],
     dataprepPipelineLocation: String,
     fast: Boolean = false) = {
     val preparedTrainingData = prepareTrainingData(input, issueInput)
@@ -281,23 +305,59 @@ object TrainingPipeline {
   }
   // TODO: tests explicitly and seperately from rest of pipeline
   // Take an indivudal PR and produce a sequence of labeled records
-  def produceRecord(input: ResultData): Seq[LabeledRecord] = {
-    val commentsOnCommitIdsWithNewLineWithFile = ImmutableHashSet(
-      input.comment_commit_ids
-        .flatZip(input.comments_positions).flatZip(input.comment_file_paths):_*)
-    val commentsOnCommitIdsWithOldLineWithFile = ImmutableHashSet(
-      input.comment_commit_ids
-        .flatZip(input.comments_original).flatZip(input.comment_file_paths):_*)
-    def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
-      commentsOnCommitIdsWithNewLineWithFile(
-        (patchRecord.commitId, Some(patchRecord.newPos), patchRecord.filename)) ||
-      commentsOnCommitIdsWithOldLineWithFile(
-        (patchRecord.commitId, Some(patchRecord.oldPos), patchRecord.filename))
+  def produceRecord(input: ParsedCommentInputData): Seq[LabeledRecord] = {
+    val patchLines = input.diff_hunks.map{diff => PatchExtractor.processPatch(diff)}
+    val patchLinesWithComments = patchLines
+      .zip(input.comments_positions.zip(input.comment_file_paths))
+    val initialRecords = patchLinesWithComments.map{case (patchRecords, commentFilenames) =>
+
+      // Construct two hashsets so we can look up if it's been commented on
+      val oldLineCommentPositions = ImmutableHashSet(
+        commentFilenames.flatMap{case (position, filename) =>
+          position.comment_position match {
+            case None => None
+            case Some(p) => (p, filename)
+          }})
+      val newLineCommentPositions = ImmutableHashSet(
+        commentFilenames.flatMap{case (position, filename) =>
+          position.new_comment_position match {
+            case None => None
+            case Some(p) => (p, filename)
+          }})
+
+      def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
+        oldLineCommentPositions(
+          (patchRecord.newPos, patchRecord.filename)) ||
+        newLineCommentPositions(
+          (patchRecord.oldPos, patchRecord.filename))
+      }
+
+
+      // Let's filter out lines which are close to comments, but not comments
+      def isCommentNearButNotAt(patchRecord: PatchRecord) = {
+        (! recordHasBeenCommentedOn(patchRecord) &&
+          (
+            oldLineCommentPositions(
+              (patchRecord.newPos+1, patchRecord.filename)) ||
+            oldLineCommentPositions(
+              (patchRecord.newPos-1, patchRecord.filename)) ||
+            newLineCommentPositions(
+              (patchRecord.oldPos+1, patchRecord.filename)) ||
+            newLineCommentPositions(
+              (patchRecord.oldPos-1, patchRecord.filename))))
+      }
+
+      patchRecords
+        .filter(patchRecord => !isCommentNearButNotAt(patchRecord))
+        .map(patchRecord =>
+          LabeledRecord(
+            patchRecord.previousLines,
+            patchRecord.text,
+            patchRecord.nextLines,
+            patchRecord.filename, patchRecord.add,
+            recordHasBeenCommentedOn(patchRecord),
+            patchRecord.oldPos))
     }
-    val patchLines = PatchExtractor.processPatch(input.patch)
-    val initialRecords = patchLines.map(patchRecord =>
-      LabeledRecord(patchRecord.text, patchRecord.filename, patchRecord.add,
-        recordHasBeenCommentedOn(patchRecord), patchRecord.oldPos)).distinct
     // The same text may show up in multiple places, if it's commented on in any of those
     // we want to tag it as commented. We could do this per file but per PR for now.
     val commentedRecords = initialRecords.filter(_.commented)

@@ -43,7 +43,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
       ModelServingService.logger.info(s"panda Received request $request")
       val pullRequestPatchURL = request.pullRequestPatchURL
       ModelServingService.logger.info(s"panda using patchURL $pullRequestPatchURL")
-      val patchFuture = DataFetch.fetchPatchForPatchUrl(pullRequestPatchURL)
+      val patchFuture = PatchFetcher.fetchPatchForPatchUrl(pullRequestPatchURL)
       ModelServingService.logger.info(s"Patch future was $patchFuture")
       val responseFuture = patchFuture.map(patch => predictOnResponse(request, patch))
       ModelServingService.logger.info(s"Response future was $responseFuture")

@@ -1,6 +1,7 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.helper
 
 import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.PatchRecord
+import scala.collection.mutable.Queue
 import scala.util.matching.Regex
 
 
@@ -23,17 +24,37 @@ object PatchExtractor {
    * Process a given patch. You don't want to look inside this.
    */
   def processPatch(patch: String, diff: Boolean = false): Seq[PatchRecord] = {
-    val lines = patch.split("\n")
+    val contextLines = 4
+    val lines = patch.split("\n").toArray
     var commitId: String = null
     var filename: String = null
     var oldPos: Integer = null
     var newPos: Integer = null
     var linesFromHeader: Integer = null
     var seenDiff: Boolean = false
+    var previousQueue: Queue[String] = new Queue[String]()
+    // Return if this is not a diff command specific line
+    def isRegularLine(line: String) = {
+      line match {
+        case diffCommandRegex(_) =>
+          false
+        case indexRegex(_, _) =>
+          false
+        case commitRegex(_) =>
+          false
+        case oldFilenameRegex(_) =>
+          false
+        case blockHeaderRegex(_, _) =>
+          false
+        case _ =>
+          true
+      }
+    }
     // Loop through the inputs
-    lines.flatMap{line =>
+    lines.zipWithIndex.flatMap{case (line, index) =>
       line match {
         case diffCommandRegex(f) =>
+          previousQueue.dequeueAll(_ => true)
           seenDiff = true
           filename = f
           newPos = null
@@ -59,28 +80,67 @@ object PatchExtractor {
           filename = f
           None
         case blockHeaderRegex(op, np) if seenDiff =>
+          previousQueue.dequeueAll(_ => true)
           oldPos = op.toInt - 1
           newPos = np.toInt - 1
           // Complicated
           linesFromHeader = linesFromHeader + 1
           None
         case addedLine(lineText) if seenDiff && newPos != null =>
+          previousQueue.enqueue(line)
+          if (previousQueue.length > contextLines) {
+            previousQueue.dequeue()
+          }
+          val nextLines = lines.slice(index, index+3).filter(isRegularLine)
+
           linesFromHeader = linesFromHeader + 1
           newPos = newPos + 1
           if (lineText.length < 2000) {
-            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, true))
+            Some(
+              PatchRecord(
+                commitId,
+                oldPos,
+                newPos,
+                Some(linesFromHeader),
+                previousQueue.toArray,
+                lineText,
+                nextLines,
+                filename,
+                true))
           } else {
             None
           }
         case removedLine(lineText) if seenDiff && newPos != null  =>
+          previousQueue.enqueue(line)
+          if (previousQueue.length > contextLines) {
+            previousQueue.dequeue()
+          }
+
+          val nextLines = lines.slice(index, index+3).filter(isRegularLine)
+
           linesFromHeader = linesFromHeader + 1
           oldPos = oldPos + 1
           if (lineText.length < 2000) {
-            Some(PatchRecord(commitId, oldPos, newPos, Some(linesFromHeader), lineText, filename, false))
+            Some(
+              PatchRecord(
+                commitId,
+                oldPos,
+                newPos,
+                Some(linesFromHeader),
+                previousQueue.toArray,
+                lineText,
+                nextLines,
+                filename,
+                false))
           } else {
             None
           }
         case _ if seenDiff && newPos != null =>
+          previousQueue.enqueue(line)
+          if (previousQueue.length > contextLines) {
+            previousQueue.dequeue()
+          }
+
           // Context line
           newPos = newPos + 1
           oldPos = oldPos + 1
