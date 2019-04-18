@@ -46,23 +46,19 @@ class IssueDataFetch(sc: SparkContext) {
   }
 
 
-  def createCSVReader() = {
-    session.read.format("csv")
-      .option("header", "true")
-      .option("inferSchema", "true")
-      .option("quote", "\"")
-      .option("escape", "\"")
+  def createReader() = {
+    session.read.format("parquet")
   }
 
   def loadInput(input: String) = {
     // Use default parallelism for the input because the other values
     // do it based on the input layout and our input is not well partitioned.
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
-    createCSVReader().load(input).repartition(inputParallelism)
+    createReader().load(input).repartition(inputParallelism)
   }
 
   def loadInput(input: Dataset[String]) = {
-    createCSVReader.csv(input)
+    createReader.csv(input)
   }
 }
 
