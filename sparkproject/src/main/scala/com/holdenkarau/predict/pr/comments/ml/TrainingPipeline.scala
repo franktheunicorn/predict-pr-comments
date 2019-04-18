@@ -28,7 +28,7 @@ case class LabeledRecord(
   nextLines: Array[String],
   filename: String,
   add: Boolean,
-  lineCommented: Boolean,
+  commented: Boolean,
   line: Int,
   commit_id: Option[String]=None,
   offset: Option[Int]=None)
@@ -308,67 +308,37 @@ object TrainingPipeline {
   def produceRecord(input: ParsedCommentInputData): Seq[LabeledRecord] = {
     val patchLines = input.diff_hunks.map{diff => PatchExtractor.processPatch(diff)}
     val patchLinesWithComments = patchLines
+      .zip(input.diff_hunks)
       .zip(input.comments_positions.zip(input.comment_file_paths))
-    val initialRecords = patchLinesWithComments.map{case (patchRecords, commentFilenames) =>
-
-      // Construct two hashsets so we can look up if it's been commented on
-      val oldLineCommentPositions = ImmutableHashSet(
-        commentFilenames.flatMap{case (position, filename) =>
-          position.comment_position match {
-            case None => None
-            case Some(p) => (p, filename)
-          }})
-      val newLineCommentPositions = ImmutableHashSet(
-        commentFilenames.flatMap{case (position, filename) =>
-          position.new_comment_position match {
-            case None => None
-            case Some(p) => (p, filename)
-          }})
-
-      def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
-        oldLineCommentPositions(
-          (patchRecord.newPos, patchRecord.filename)) ||
-        newLineCommentPositions(
-          (patchRecord.oldPos, patchRecord.filename))
-      }
-
-
-      // Let's filter out lines which are close to comments, but not comments
-      def isCommentNearButNotAt(patchRecord: PatchRecord) = {
-        (! recordHasBeenCommentedOn(patchRecord) &&
-          (
-            oldLineCommentPositions(
-              (patchRecord.newPos+1, patchRecord.filename)) ||
-            oldLineCommentPositions(
-              (patchRecord.newPos-1, patchRecord.filename)) ||
-            newLineCommentPositions(
-              (patchRecord.oldPos+1, patchRecord.filename)) ||
-            newLineCommentPositions(
-              (patchRecord.oldPos-1, patchRecord.filename))))
-      }
-
+    val initialRecordsWithComments = patchLinesWithComments.flatMap{
+      case ((patchRecords, diff_hunk), (commentPosition, commentFilename)) =>
       patchRecords
-        .filter(patchRecord => !isCommentNearButNotAt(patchRecord))
+        // We have a diff view without the filename
+        .filter(record =>
+          record.oldPos == commentPosition.comment_position ||
+          record.newPos == commentPosition.new_comment_position)
         .map(patchRecord =>
           LabeledRecord(
-            patchRecord.previousLines,
-            patchRecord.text,
-            patchRecord.nextLines,
-            patchRecord.filename, patchRecord.add,
-            recordHasBeenCommentedOn(patchRecord),
-            patchRecord.oldPos))
+            previousLines=patchRecord.previousLines,
+            lineText=patchRecord.text,
+            nextLines=patchRecord.nextLines,
+            filename=commentFilename,
+            add=patchRecord.add,
+            commented=true,
+            line=patchRecord.oldPos))
     }
+    val candidateRecords = initialRecordsWithComments
     // The same text may show up in multiple places, if it's commented on in any of those
     // we want to tag it as commented. We could do this per file but per PR for now.
-    val commentedRecords = initialRecords.filter(_.commented)
+    val commentedRecords = candidateRecords.filter(_.commented)
     // Only output PRs which have a comment that we can resolve
     if (commentedRecords.isEmpty) {
       commentedRecords
     } else {
       val seenTextAndFile = new HashSet[String]
-      val uncommentedRecords = initialRecords.filter(r => !r.commented)
+      val uncommentedRecords = candidateRecords.filter(r => !r.commented)
       val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
-        record => seenTextAndFile.add(record.text)}
+        record => seenTextAndFile.add(record.lineText)}
       resultRecords
     }
   }
