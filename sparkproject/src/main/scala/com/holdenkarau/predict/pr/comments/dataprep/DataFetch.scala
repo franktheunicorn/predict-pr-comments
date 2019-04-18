@@ -66,6 +66,7 @@ class DataFetch(sc: SparkContext) {
       filteredInput("pull_request_url"),
       filteredInput("pull_patch_url"),
       filteredInput("comment_positions"),
+      // We probably need a UDF here to extract the diff_hunks
       filteredInput("diff_hunks"),
       processPathsUDF(filteredInput("comment_file_path")).alias("comment_file_paths"),
       filteredInput("comment_commit_ids")).as[ParsedCommentInputData]
