@@ -1,7 +1,7 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
 /**
- * Fetch the patches from GitHub
+ * Fetch the issues from GitHub
  */
 
 import org.apache.spark._
