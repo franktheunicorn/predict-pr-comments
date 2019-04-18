@@ -27,7 +27,21 @@ case class ResultCommentData(
   comment_file_paths: List[String],
   comment_commit_ids: List[String],
   diff_hunks: Array[String])
-case class PatchRecord(commitId: String, oldPos: Int, newPos: Int,
-  linesFromHeader: Option[Int], text: String, filename: String, add: Boolean)
-case class IssueInputRecord(name: String, url: String)
-case class IssueStackTrace(project: String, filename: String, line: Int)
+
+case class CommentPatchRecord(
+  commitId: String,
+  oldPos: Int,
+  newPos: Int,
+  linesFromHeader: Option[Int],
+  lineWithContext: String,
+  lineText: String,
+  filename: String,
+  add: Boolean)
+
+case class IssueInputRecord(
+  name: String,
+  url: String)
+
+case class IssueStackTrace(project: String,
+  filename: String,
+  line: Int)
