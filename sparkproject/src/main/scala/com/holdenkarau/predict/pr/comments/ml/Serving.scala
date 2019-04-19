@@ -79,7 +79,9 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
         .filter($"line" === oldPos)
         .count()
       PreparedData(
-        text=record.text,
+        previousLines=record.previousLines,
+        lineText=record.text,
+        nextLines=record.nextLines,
         filename=record.filename,
         add=record.add,
         // TODO: Hack fix this in training pipeline later
