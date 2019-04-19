@@ -34,19 +34,21 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
       "d2b11db69b1abb5cbe0b41c4c17352504d77c25a")
   }
 
-/*  test("calling with a local file fetches a result") {
+  test("calling with a local file fetches a result") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
     val dataFetch = new DataFetch(sc)
     val patchFetcher = new PatchFetcher(sc)
-    val inputData = dataFetch.loadInput(session.createDataset(inputRDD)).as[InputData]
+    val inputData = dataFetch.loadJsonInput(
+      session.createDataset(inputRDD)).as[CommentInputData]
     val cleanedInputData = dataFetch.cleanInputs(inputData)
     val cachedData = session.emptyDataset[StoredPatch]
     val result = patchFetcher.fetchPatches(cleanedInputData, cachedData)
     result.count() should be (1)
   }
 
+  /*
   test("cache records are filtered out") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
