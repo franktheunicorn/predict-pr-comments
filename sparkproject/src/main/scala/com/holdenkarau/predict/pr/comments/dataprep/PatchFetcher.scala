@@ -26,11 +26,12 @@ class PatchFetcher(sc: SparkContext) {
    * Note: this needs new types
    */
   def fetchPatches[T <: HasPatchUrl](inputData: Dataset[T],
-    cachedData: Dataset[(T, StoredPatch)]):
-      Dataset[(Row, StoredPatch)] = {
+    cachedData: Dataset[StoredPatch])
+    (implicit e1: Encoder[T], e2: Encoder[(T, StoredPatch)]):
+      Dataset[(T, StoredPatch)] = {
     val joinedData = inputData.join(cachedData,
       Seq("pull_request_url"),
-      joinType = "left_anti")
+      joinType = "left_anti").as[T]
     val result = joinedData.mapPartitions(
       PatchFetcher.fetchPatchesIterator)
     result
