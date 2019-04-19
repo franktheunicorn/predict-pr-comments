@@ -323,7 +323,7 @@ object TrainingPipeline {
         diff => PatchExtractor.processPatch(diff)}
       val patchLinesWithComments = patchLines
         .zip(parsed_input.diff_hunks)
-        .zip(parsed_input.comments_positions.zip(parsed_input.comment_file_paths))
+        .zip(parsed_input.comment_positions.zip(parsed_input.comment_file_paths))
       patchLinesWithComments.flatMap{
         case ((patchRecords, diff_hunk), (commentPosition, commentFilename)) =>
           patchRecords
@@ -349,21 +349,21 @@ object TrainingPipeline {
       // Make hash sets for fast lookup of lines which have been commented on
       val commentsOnCommitIdsWithNewLineWithFile = ImmutableHashSet(
         parsed_input.comment_commit_ids
-          .flatZip(parsed_input.comments_positions.map(
+          .flatZip(parsed_input.comment_positions.map(
             _.new_position))
           .flatZip(parsed_input.comment_file_paths):_*)
       val commentsOnCommitIdsWithOldLineWithFile = ImmutableHashSet(
         parsed_input.comment_commit_ids
-          .flatZip(parsed_input.comments_positions.map(
+          .flatZip(parsed_input.comment_positions.map(
             _.original_position))
           .flatZip(parsed_input.comment_file_paths):_*)
       // More loosely make the same hash set but without the commit ID
       val commentsWithNewLineWithFile = ImmutableHashSet(
-        parsed_input.comments_positions.map(
+        parsed_input.comment_positions.map(
           _.new_position)
           .flatZip(parsed_input.comment_file_paths):_*)
       val commentsWithOldLineWithFile = ImmutableHashSet(
-        parsed_input.comments_positions.map(
+        parsed_input.comment_positions.map(
           _.original_position)
           .flatZip(parsed_input.comment_file_paths):_*)
 

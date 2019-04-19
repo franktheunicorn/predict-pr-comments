@@ -20,6 +20,7 @@ lazy val root = (project in file(".")).
     javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled"),
     scalacOptions ++= Seq("-deprecation", "-unchecked"),
     parallelExecution in Test := false,
+    testOptions in Test += Tests.Argument("-oDF"),
     fork := true,
 
     coverageHighlighting := true,
