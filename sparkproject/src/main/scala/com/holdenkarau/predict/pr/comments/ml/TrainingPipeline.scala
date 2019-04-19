@@ -37,8 +37,6 @@ case class PreparedData(
   previousLines: Array[String],
   lineText: String,
   nextLines: Array[String],
-  previousTextTokenized: Array[String],
-  lineTextTokenized: Array[String],
   filename: String,
   add: Boolean,
   commented: Double,
@@ -110,7 +108,20 @@ class TrainingPipeline(sc: SparkContext) {
         "only_spaces", expr("""text rlike "^\s+$" """).cast("double"))
       .withColumn(
         "not_in_issues", isnull($"pandas").cast("double"))
-      .select($"text", $"labaeledRecords.filename", $"add", $"commented", $"extension", $"line_length", $"label", $"only_spaces", $"not_in_issues", $"commit_id", $"offset")
+      .select(
+        $"previousLines",
+        $"lineText",
+        $"nextLines",
+        $"labaeledRecords.filename",
+        $"add",
+        $"commented",
+        $"extension",
+        $"line_length",
+        $"label",
+        $"only_spaces",
+        $"not_in_issues",
+        $"commit_id",
+        $"offset")
       .as[PreparedData]
   }
 
@@ -307,32 +318,94 @@ object TrainingPipeline {
   // Take an indivudal PR and produce a sequence of labeled records
   def produceRecord(input: ResultCommentData): Seq[LabeledRecord] = {
     // First off we produce records using the along-side diff hunks
-    val parsed_input = input.parsed_input
-    val patchLines = parsed_input.diff_hunks.map{diff => PatchExtractor.processPatch(diff)}
-    val patchLinesWithComments = patchLines
-      .zip(parsed_input.diff_hunks)
-      .zip(parsed_input.comments_positions.zip(parsed_input.comment_file_paths))
-    val initialRecordsWithComments = patchLinesWithComments.flatMap{
-      case ((patchRecords, diff_hunk), (commentPosition, commentFilename)) =>
-      patchRecords
-        // We have a diff view without the filename
-        .filter(record =>
-          record.oldPos == commentPosition.comment_position ||
-          record.newPos == commentPosition.new_comment_position)
-        .map(patchRecord =>
-          LabeledRecord(
-            previousLines=patchRecord.previousLines,
-            lineText=patchRecord.text,
-            nextLines=patchRecord.nextLines,
-            filename=commentFilename,
-            add=patchRecord.add,
-            commented=true,
-            line=patchRecord.oldPos))
+    def produceRecordsFromDiffHunks(parsed_input: ParsedCommentInputData) = {
+      val patchLines = parsed_input.diff_hunks.map{
+        diff => PatchExtractor.processPatch(diff)}
+      val patchLinesWithComments = patchLines
+        .zip(parsed_input.diff_hunks)
+        .zip(parsed_input.comments_positions.zip(parsed_input.comment_file_paths))
+      patchLinesWithComments.flatMap{
+        case ((patchRecords, diff_hunk), (commentPosition, commentFilename)) =>
+          patchRecords
+          // We have a diff view without the filename
+            .filter(record =>
+              record.oldPos == commentPosition.comment_position ||
+                record.newPos == commentPosition.new_comment_position)
+            .map(patchRecord =>
+              LabeledRecord(
+                previousLines=patchRecord.previousLines,
+                lineText=patchRecord.text,
+                nextLines=patchRecord.nextLines,
+                filename=commentFilename,
+                add=patchRecord.add,
+                commented=true,
+                line=patchRecord.oldPos))
+      }
     }
+
     // Now we produce candidate records from the patch
-    
+    def produceRecordsFromPatch(input: ResultCommentData): Seq[LabeledRecord] = {
+      val parsed_input = input.parsed_input
+      // Make hash sets for fast lookup of lines which have been commented on
+      val commentsOnCommitIdsWithNewLineWithFile = ImmutableHashSet(
+        parsed_input.comment_commit_ids
+          .flatZip(parsed_input.comments_positions.map(_.new_comment_position))
+          .flatZip(parsed_input.comment_file_paths):_*)
+      val commentsOnCommitIdsWithOldLineWithFile = ImmutableHashSet(
+        parsed_input.comment_commit_ids
+          .flatZip(parsed_input.comments_positions.map(_.comment_position))
+          .flatZip(parsed_input.comment_file_paths):_*)
+      // More loosely make the same hash set but without the commit ID
+      val commentsWithNewLineWithFile = ImmutableHashSet(
+        parsed_input.comments_positions.map(_.new_comment_position)
+          .flatZip(parsed_input.comment_file_paths):_*)
+      val commentsWithOldLineWithFile = ImmutableHashSet(
+        parsed_input.comments_positions.map(_.comment_position)
+          .flatZip(parsed_input.comment_file_paths):_*)
+
+      def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
+        commentsOnCommitIdsWithNewLineWithFile(
+          (patchRecord.commitId, Some(patchRecord.newPos), patchRecord.filename)) ||
+        commentsOnCommitIdsWithOldLineWithFile(
+          (patchRecord.commitId, Some(patchRecord.oldPos), patchRecord.filename))
+      }
+
+      // Filter out negative records which are "too close" to comments
+      def recordIsCloseToAComment(patchRecord: PatchRecord) = {
+        if (recordHasBeenCommentedOn(patchRecord)) {
+          false
+        } else {
+          val fuzzyLines = List(
+            patchRecord.newPos-1,
+            patchRecord.newPos+1,
+            patchRecord.newPos,
+            patchRecord.oldPos,
+            patchRecord.oldPos-1,
+            patchRecord.oldPos+1).map(Some(_))
+          fuzzyLines.exists(line =>
+            commentsWithNewLineWithFile(line, patchRecord.filename)
+              || commentsWithOldLineWithFile(line, patchRecord.filename))
+        }
+      }
+
+      val patchLines = PatchExtractor.processPatch(input.patch)
+        .filter(record => recordIsCloseToAComment(record))
+      patchLines.map(patchRecord =>
+        LabeledRecord(
+          previousLines=patchRecord.previousLines,
+          lineText=patchRecord.text,
+          nextLines=patchRecord.nextLines,
+          filename=patchRecord.filename,
+          add=patchRecord.add,
+          commented=true,
+          line=patchRecord.oldPos))
+    }
+
+    val initialRecordsWithComments = produceRecordsFromDiffHunks(input.parsed_input)
+    val recordsFromPatch = produceRecordsFromPatch(input)
     // Now we combine them
-    val candidateRecords = initialRecordsWithComments
+    val candidateRecords = (initialRecordsWithComments ++ recordsFromPatch).distinct
+
     // The same text may show up in multiple places, if it's commented on in any of those
     // we want to tag it as commented. We could do this per file but per PR for now.
     val commentedRecords = candidateRecords.filter(_.commented)
@@ -340,10 +413,11 @@ object TrainingPipeline {
     if (commentedRecords.isEmpty) {
       commentedRecords
     } else {
-      val seenTextAndFile = new HashSet[String]
+      val seenText = new HashSet[String]
       val uncommentedRecords = candidateRecords.filter(r => !r.commented)
-      val resultRecords = (commentedRecords ++ uncommentedRecords).filter{
-        record => seenTextAndFile.add(record.lineText)}
+      commentedRecords.foreach{r => seenText.add(r.lineText)}
+      val resultRecords = commentedRecords ++ (uncommentedRecords.filter{
+        record => seenText.add(record.lineText)})
       resultRecords
     }
   }
