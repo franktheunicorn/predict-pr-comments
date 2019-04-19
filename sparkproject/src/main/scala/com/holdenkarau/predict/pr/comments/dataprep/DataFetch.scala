@@ -62,12 +62,9 @@ class DataFetch(sc: SparkContext) {
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
 
-  def createCSVReader() = {
-    session.read.format("csv")
-      .option("header", "true")
+  def createJSONReader() = {
+    session.read.format("json")
       .option("inferSchema", "true")
-      .option("quote", "\"")
-      .option("escape", "\"")
   }
 
   def createReader() = {
@@ -81,8 +78,8 @@ class DataFetch(sc: SparkContext) {
     createReader().load(input).repartition(inputParallelism)
   }
 
-  def loadInput(input: Dataset[String]) = {
-    createCSVReader.csv(input)
+  def loadJsonInput(input: Dataset[String]) = {
+    createJSONReader.json(input)
   }
 
 

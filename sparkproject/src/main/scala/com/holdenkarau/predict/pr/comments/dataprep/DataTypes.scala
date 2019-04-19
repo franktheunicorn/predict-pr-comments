@@ -1,6 +1,6 @@
 package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
-import org.joda.time.DateTime
+import java.sql.Date
 
 trait HasPatchUrl{
   val pull_request_url: String
@@ -10,11 +10,11 @@ trait HasPatchUrl{
 
 case class StoredPatch(pull_request_url: String, patch: String, diff: String)
 case class CommentPosition(
-  comment_position: Option[Int],
-  new_comment_position: Option[Int])
+  original_position: Option[Int],
+  new_position: Option[Int])
 case class CommentInputData(
   pull_patch_url: String,
-  created_date: DateTime,
+  created_date: Date,
   pull_request_url: String,
   comments_positions: Array[CommentPosition],
   comment_text: Array[String],
