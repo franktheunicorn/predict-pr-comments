@@ -25,8 +25,41 @@ class DataFetch(sc: SparkContext) {
     cache: Option[String]): Unit = {
     val rawInputData = loadInput(input)
     val inputData = rawInputData.as[CommentInputData]
+    // Check and see if we have data prom a previous run
+    val cachedData = cache match {
+      case Some(x) =>
+        try {
+          session.read.format("parquet").load(x).as[StoredPatch]
+        } catch {
+          case _ => session.emptyDataset[StoredPatch]
+        }
+      case _ => session.emptyDataset[StoredPatch]
+    }
     val cleanedInputData = cleanInputs(inputData)
-    cleanedInputData.write.format("parquet").mode(SaveMode.Append).save(output)
+
+    val patchFetcher = new PatchFetcher(sc)
+
+    val patches = patchFetcher.fetchPatches(cleanedInputData, cachedData)
+    cache match {
+      case Some(x) =>
+        patches.cache()
+        patches.map(_._2).write.format("parquet").mode(SaveMode.Append).save(x)
+      case _ => // No cahce, no problem!
+    }
+
+    val resultData = patches.mapPartitions{partition =>
+      def processPatch (result: (ParsedCommentInputData, StoredPatch)): ResultCommentData = {
+        val (input, patch) = result
+        ResultCommentData(
+          input.pull_request_url,
+          input.pull_patch_url,
+          input,
+          patch.patch,
+          patch.diff)
+      }
+      partition.map(processPatch)
+    }
+    resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
 
   def createCSVReader() = {

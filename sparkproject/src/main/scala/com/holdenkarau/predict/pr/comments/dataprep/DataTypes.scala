@@ -2,6 +2,12 @@ package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
 
 import org.joda.time.DateTime
 
+trait HasPatchUrl{
+  val pull_request_url: String
+  val pull_patch_url: String
+}
+
+
 case class StoredPatch(pull_request_url: String, patch: String, diff: String)
 case class CommentPosition(
   comment_position: Option[Int],
@@ -22,7 +28,14 @@ case class ParsedCommentInputData(
   comment_text: Array[String],
   diff_hunks: Array[String],
   comment_file_paths: List[String],
-  comment_commit_ids: List[String])
+  comment_commit_ids: List[String]) extends HasPatchUrl
+
+case class ResultCommentData(
+  pull_request_url: String,
+  pull_patch_url: String,
+  parsed_input: ParsedCommentInputData,
+  patch: String,
+  diff: String) extends HasPatchUrl
 
 case class CommentPatchRecord(
   commitId: String,
@@ -53,7 +66,3 @@ case class PatchRecord(
   filename: String,
   add: Boolean)
 
-trait HasPatchUrl{
-  val pull_request_url: String
-  val pull_patch_url: String
-}

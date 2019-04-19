@@ -19,7 +19,7 @@ import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 
 import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.{
-  PatchRecord, ParsedCommentInputData, IssueStackTrace}
+  ResultCommentData, PatchRecord, ParsedCommentInputData, IssueStackTrace}
 import com.holdenkarau.predict.pr.comments.sparkProject.helper.PatchExtractor
 
 case class LabeledRecord(
@@ -57,10 +57,10 @@ class TrainingPipeline(sc: SparkContext) {
 
   def trainAndSaveModel(input: String, issueInput: String, output: String, dataprepPipelineLocation: String) = {
     // TODO: Do this
-    val schema = ScalaReflection.schemaFor[ParsedCommentInputData].dataType.asInstanceOf[StructType]
+    val schema = ScalaReflection.schemaFor[ResultCommentData].dataType.asInstanceOf[StructType]
     val issueSchema = ScalaReflection.schemaFor[IssueStackTrace].dataType.asInstanceOf[StructType]
 
-    val inputData = session.read.format("parquet").schema(schema).load(input).as[ParsedCommentInputData]
+    val inputData = session.read.format("parquet").schema(schema).load(input).as[ResultCommentData]
     val issueInputData = session.read.format("parquet").schema(issueSchema).load(issueInput).as[IssueStackTrace]
     // Reparition the inputs
     val inputParallelism = sc.getConf.get("spark.default.parallelism", "100").toInt
@@ -83,7 +83,7 @@ class TrainingPipeline(sc: SparkContext) {
 
 
   // Produce data for training
-  def prepareTrainingData(input: Dataset[ParsedCommentInputData],
+  def prepareTrainingData(input: Dataset[ResultCommentData],
     issues: Dataset[IssueStackTrace]): Dataset[PreparedData] = {
 
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(TrainingPipeline.produceRecord)
@@ -137,7 +137,7 @@ class TrainingPipeline(sc: SparkContext) {
     result
   }
 
-  def trainAndEvalModel(input: Dataset[ParsedCommentInputData],
+  def trainAndEvalModel(input: Dataset[ResultCommentData],
     issueInput: Dataset[IssueStackTrace],
     dataprepPipelineLocation: String,
     split: List[Double] = List(0.9, 0.1), fast: Boolean = false) = {
@@ -237,7 +237,7 @@ class TrainingPipeline(sc: SparkContext) {
     model
   }
 
-  def trainModel(input: Dataset[ParsedCommentInputData], issueInput: Dataset[IssueStackTrace],
+  def trainModel(input: Dataset[ResultCommentData], issueInput: Dataset[IssueStackTrace],
     dataprepPipelineLocation: String,
     fast: Boolean = false) = {
     val preparedTrainingData = prepareTrainingData(input, issueInput)
@@ -305,11 +305,13 @@ object TrainingPipeline {
   }
   // TODO: tests explicitly and seperately from rest of pipeline
   // Take an indivudal PR and produce a sequence of labeled records
-  def produceRecord(input: ParsedCommentInputData): Seq[LabeledRecord] = {
-    val patchLines = input.diff_hunks.map{diff => PatchExtractor.processPatch(diff)}
+  def produceRecord(input: ResultCommentData): Seq[LabeledRecord] = {
+    // First off we produce records using the along-side diff hunks
+    val parsed_input = input.parsed_input
+    val patchLines = parsed_input.diff_hunks.map{diff => PatchExtractor.processPatch(diff)}
     val patchLinesWithComments = patchLines
-      .zip(input.diff_hunks)
-      .zip(input.comments_positions.zip(input.comment_file_paths))
+      .zip(parsed_input.diff_hunks)
+      .zip(parsed_input.comments_positions.zip(parsed_input.comment_file_paths))
     val initialRecordsWithComments = patchLinesWithComments.flatMap{
       case ((patchRecords, diff_hunk), (commentPosition, commentFilename)) =>
       patchRecords
@@ -327,6 +329,9 @@ object TrainingPipeline {
             commented=true,
             line=patchRecord.oldPos))
     }
+    // Now we produce candidate records from the patch
+    
+    // Now we combine them
     val candidateRecords = initialRecordsWithComments
     // The same text may show up in multiple places, if it's commented on in any of those
     // we want to tag it as commented. We could do this per file but per PR for now.
