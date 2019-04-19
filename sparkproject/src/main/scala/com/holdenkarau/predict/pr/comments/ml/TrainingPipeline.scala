@@ -329,8 +329,8 @@ object TrainingPipeline {
           patchRecords
           // We have a diff view without the filename
             .filter(record =>
-              record.oldPos == commentPosition.comment_position ||
-                record.newPos == commentPosition.new_comment_position)
+              record.oldPos == commentPosition.original_position ||
+                record.newPos == commentPosition.new_position)
             .map(patchRecord =>
               LabeledRecord(
                 previousLines=patchRecord.previousLines,
@@ -349,18 +349,22 @@ object TrainingPipeline {
       // Make hash sets for fast lookup of lines which have been commented on
       val commentsOnCommitIdsWithNewLineWithFile = ImmutableHashSet(
         parsed_input.comment_commit_ids
-          .flatZip(parsed_input.comments_positions.map(_.new_comment_position))
+          .flatZip(parsed_input.comments_positions.map(
+            _.new_position))
           .flatZip(parsed_input.comment_file_paths):_*)
       val commentsOnCommitIdsWithOldLineWithFile = ImmutableHashSet(
         parsed_input.comment_commit_ids
-          .flatZip(parsed_input.comments_positions.map(_.comment_position))
+          .flatZip(parsed_input.comments_positions.map(
+            _.original_position))
           .flatZip(parsed_input.comment_file_paths):_*)
       // More loosely make the same hash set but without the commit ID
       val commentsWithNewLineWithFile = ImmutableHashSet(
-        parsed_input.comments_positions.map(_.new_comment_position)
+        parsed_input.comments_positions.map(
+          _.new_position)
           .flatZip(parsed_input.comment_file_paths):_*)
       val commentsWithOldLineWithFile = ImmutableHashSet(
-        parsed_input.comments_positions.map(_.comment_position)
+        parsed_input.comments_positions.map(
+          _.original_position)
           .flatZip(parsed_input.comment_file_paths):_*)
 
       def recordHasBeenCommentedOn(patchRecord: PatchRecord) = {
