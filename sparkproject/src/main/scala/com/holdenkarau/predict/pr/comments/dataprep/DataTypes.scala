@@ -14,9 +14,9 @@ case class CommentPosition(
   new_position: Option[Int])
 case class CommentInputData(
   pull_patch_url: String,
-  created_date: Date,
+  created_date: String,//ugh
   pull_request_url: String,
-  comments_positions: Array[CommentPosition],
+  comment_positions: Array[CommentPosition],
   comment_text: Array[String],
   diff_hunks: Array[String],
   comment_commit_ids: Array[String],
@@ -24,7 +24,7 @@ case class CommentInputData(
 case class ParsedCommentInputData(
   pull_request_url: String,
   pull_patch_url: String,
-  comments_positions: List[CommentPosition],
+  comment_positions: List[CommentPosition],
   comment_text: Array[String],
   diff_hunks: Array[String],
   comment_file_paths: List[String],

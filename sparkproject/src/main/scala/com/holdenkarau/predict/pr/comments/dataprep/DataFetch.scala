@@ -4,9 +4,14 @@ package com.holdenkarau.predict.pr.comments.sparkProject.dataprep
  * Fetching the big query comment results
  */
 
+import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
@@ -62,13 +67,17 @@ class DataFetch(sc: SparkContext) {
     resultData.write.format("parquet").mode(SaveMode.Append).save(output)
   }
 
+  val inputSchema = ScalaReflection.schemaFor[CommentInputData]
+    .dataType.asInstanceOf[StructType]
+
   def createJSONReader() = {
     session.read.format("json")
-      .option("inferSchema", "true")
+      .schema(inputSchema)
   }
 
   def createReader() = {
     session.read.format("parquet")
+      .schema(inputSchema)
   }
 
   def loadInput(input: String) = {
@@ -92,14 +101,21 @@ class DataFetch(sc: SparkContext) {
     // Strip out the start end "s
     val processPathsUDF = udf(DataFetch.processPaths _)
 
+    // Strip out all the "s
+    val processCommitIdsUDF = udf(DataFetch.processCommitIds _)
+
+    // Strip out all the "s
+    val processDiffHunksUDF = udf(DataFetch.processDiffHunks _)
+
     val cleanedInputData = filteredInput.select(
       filteredInput("pull_request_url"),
       filteredInput("pull_patch_url"),
       filteredInput("comment_positions"),
-      // We probably need a UDF here to extract the diff_hunks
-      filteredInput("diff_hunks"),
-      processPathsUDF(filteredInput("comment_file_path")).alias("comment_file_paths"),
-      filteredInput("comment_commit_ids")).as[ParsedCommentInputData]
+      filteredInput("comment_text"),
+      processDiffHunksUDF(filteredInput("diff_hunks")).alias("diff_hunks"),
+      processPathsUDF(filteredInput("comment_file_paths")).alias("comment_file_paths"),
+      processCommitIdsUDF(filteredInput("comment_commit_ids")).alias("comment_commit_ids")
+    ).as[ParsedCommentInputData]
     cleanedInputData
   }
 
@@ -108,5 +124,18 @@ class DataFetch(sc: SparkContext) {
 object DataFetch {
   def processPaths(input: Seq[String]): Seq[String] = {
     input.map(_.replaceAll("^\"|\"$", ""))
+  }
+
+  def processDiffHunks(input: Seq[String]): Seq[String] = {
+    val mapper = new ObjectMapper() with ScalaObjectMapper
+    mapper.registerModule(DefaultScalaModule)
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    input.map(elem =>
+      mapper.readValue[String](elem)
+    )
+  }
+
+  def processCommitIds(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("\"", ""))
   }
 }

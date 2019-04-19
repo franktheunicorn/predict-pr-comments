@@ -58,7 +58,10 @@ class IssueDataFetch(sc: SparkContext) {
   }
 
   def loadInput(input: Dataset[String]) = {
-    createReader.csv(input)
+    createReader.format("csv")
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .csv(input)
   }
 }
 
