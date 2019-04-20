@@ -80,34 +80,45 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     val inputData = dataFetch.loadJsonInput(
       session.createDataset(inputRDD)).as[CommentInputData]
     val inputPath = s"$tempPath/input.parquet"
+    inputData.write.format("parquet").save(inputPath)
 
     // Run the test
     val outputPath = s"$tempPath/output.parquet"
-    inputData.write.format("parquet").save(inputPath)
     dataFetch.fetch(inputPath, outputPath, None)
     val result = session.read.format("parquet").load(outputPath)
     result.count() should be (1)
   }
 
-  /*
+
   test("test the main entry point - with cache") {
     val tempDir = Utils.createTempDir()
     val tempPath = tempDir.toPath().toAbsolutePath().toString()
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
-    val inputRDD = sc.parallelize(standardInputList, 1)
-    val inputPath = s"$tempPath/input.csv"
-    val outputPath = s"$tempPath/output.csv"
-    val cachePath = s"$tempPath/cache"
-    inputRDD.saveAsTextFile(inputPath)
     val dataFetch = new DataFetch(sc)
+
+    // Construct the input
+    val inputRDD = sc.parallelize(standardInputList, 1)
+    val inputData = dataFetch.loadJsonInput(
+      session.createDataset(inputRDD)).as[CommentInputData]
+    val inputPath = s"$tempPath/input.parquet"
+    inputData.write.format("parquet").save(inputPath)
+
+    // Run the test
+    val outputPath = s"$tempPath/output.parquet"
+    val cachePath = s"$tempPath/cache"
+    // First run populate the cache
     dataFetch.fetch(inputPath, outputPath, Some(cachePath))
+    // Run again, with the cache
     dataFetch.fetch(inputPath, outputPath, Some(cachePath))
     val result = session.read.format("parquet").load(outputPath)
     result.count() should be (1)
-    result.as[ResultData].collect()(0).patch should include ("Subject: [PATCH")
-    result.as[ResultData].collect()(0).diff should include ("@@ -")
-    result.as[ResultData].collect()(0).diff should not include ("Subject: [PATCH")
+    val typedResultHead = result.as[ResultCommentData].collect()(0)
+    typedResultHead.patch should include ("Subject: [PATCH")
+    typedResultHead.diff should include ("@@ -")
+    typedResultHead.diff should not include ("Subject: [PATCH")
+    typedResultHead.parsed_input.diff_hunks(0) should include ("@@ -")
+    // Json escaping
+    typedResultHead.parsed_input.diff_hunks(0) should not include ("\"@@ -")
   }
- */
 }
