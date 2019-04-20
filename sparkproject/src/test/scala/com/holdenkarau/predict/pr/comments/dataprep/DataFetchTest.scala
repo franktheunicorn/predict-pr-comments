@@ -48,38 +48,48 @@ class DataFetchTest extends FunSuite with SharedSparkContext {
     result.count() should be (1)
   }
 
-  /*
+
   test("cache records are filtered out") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
     val inputRDD = sc.parallelize(standardInputList)
     val dataFetch = new DataFetch(sc)
-    val inputData = dataFetch.loadInput(session.createDataset(inputRDD)).as[InputData]
+    val patchFetcher = new PatchFetcher(sc)
+    val inputData = dataFetch.loadJsonInput(
+      session.createDataset(inputRDD)).as[CommentInputData]
     val basicCached = StoredPatch(
-      "https://api.github.com/repos/Dreamacro/clash/pulls/96",
+      "https://api.github.com/repos/CepCap/qna/pulls/7",
       "notreal",
       "stillnotreal")
     val cachedData = session.createDataset(sc.parallelize(List(basicCached)))
     val cleanedInputData = dataFetch.cleanInputs(inputData)
-    val result = dataFetch.fetchPatches(cleanedInputData, cachedData)
+    val result = patchFetcher.fetchPatches(cleanedInputData, cachedData)
     result.count() should be (0)
   }
+
 
   test("test the main entry point - no cache") {
     val tempDir = Utils.createTempDir()
     val tempPath = tempDir.toPath().toAbsolutePath().toString()
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
-    val inputRDD = sc.parallelize(standardInputList, 1)
-    val inputPath = s"$tempPath/input.csv"
-    val outputPath = s"$tempPath/output.csv"
-    inputRDD.saveAsTextFile(inputPath)
     val dataFetch = new DataFetch(sc)
+
+    // Construct the input
+    val inputRDD = sc.parallelize(standardInputList, 1)
+    val inputData = dataFetch.loadJsonInput(
+      session.createDataset(inputRDD)).as[CommentInputData]
+    val inputPath = s"$tempPath/input.parquet"
+
+    // Run the test
+    val outputPath = s"$tempPath/output.parquet"
+    inputData.write.format("parquet").save(inputPath)
     dataFetch.fetch(inputPath, outputPath, None)
     val result = session.read.format("parquet").load(outputPath)
     result.count() should be (1)
   }
 
+  /*
   test("test the main entry point - with cache") {
     val tempDir = Utils.createTempDir()
     val tempPath = tempDir.toPath().toAbsolutePath().toString()
