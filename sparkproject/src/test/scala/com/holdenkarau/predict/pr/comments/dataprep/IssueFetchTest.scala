@@ -50,7 +50,8 @@ Exception in thread "main" java.lang.NullPointerException
     val issueInputList = List("name,url",
       "holdenk/spark-testing-base,\"\"\"https://github.com/holdenk/spark-testing-base/issues/132\"\"\"")
     val inputRDD = sc.parallelize(issueInputList, 1)
-    val inputData = issueDataFetch.loadInput(session.createDataset(inputRDD)).as[IssueInputRecord]
+    val inputData = issueDataFetch.loadInput(
+      session.createDataset(inputRDD)).as[IssueInputRecord]
     val result = issueDataFetch.processInput(inputData).collect()
 
     val expected = List(

@@ -104,7 +104,7 @@ object IssueDataFetch {
   }
 
   def processPath(input: String): String = {
-    input.replaceAll("^\"|\"$", "")
+    input.replaceAll("^\"+|\"+$", "")
   }
 
   def extractStackTraces(input: (IssueInputRecord, String)): Iterator[IssueStackTrace] = {
