@@ -101,6 +101,9 @@ class DataFetch(sc: SparkContext) {
     // Strip out the start end "s
     val processPathsUDF = udf(DataFetch.processPaths _)
 
+    // Strip out the start end "s
+    val processUrlUDF = udf(DataFetch.processUrl _)
+
     // Strip out all the "s
     val processCommitIdsUDF = udf(DataFetch.processCommitIds _)
 
@@ -108,8 +111,10 @@ class DataFetch(sc: SparkContext) {
     val processDiffHunksUDF = udf(DataFetch.processDiffHunks _)
 
     val cleanedInputData = filteredInput.select(
-      filteredInput("pull_request_url"),
-      filteredInput("pull_patch_url"),
+      processUrlUDF(filteredInput("pull_request_url"))
+        .alias("pull_request_url"),
+      processUrlUDF(filteredInput("pull_patch_url"))
+        .alias("pull_patch_url"),
       filteredInput("comment_positions"),
       filteredInput("comment_text"),
       processDiffHunksUDF(filteredInput("diff_hunks")).alias("diff_hunks"),
@@ -122,6 +127,11 @@ class DataFetch(sc: SparkContext) {
 }
 
 object DataFetch {
+
+  def processUrl(input: String): String = {
+    input.replaceAll("^\"|\"$", "")
+  }
+
   def processPaths(input: Seq[String]): Seq[String] = {
     input.map(_.replaceAll("^\"|\"$", ""))
   }
