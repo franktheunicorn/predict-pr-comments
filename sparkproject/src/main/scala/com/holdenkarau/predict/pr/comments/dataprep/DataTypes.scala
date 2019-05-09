@@ -12,11 +12,13 @@ case class StoredPatch(pull_request_url: String, patch: String, diff: String)
 case class CommentPosition(
   original_position: Option[Int],
   new_position: Option[Int])
+
 case class CommentInputData(
   pull_patch_url: String,
   created_date: String,//ugh
   pull_request_url: String,
-  comment_positions: Array[CommentPosition],
+  // The JSON dumps from BQ have the comment pos as strings even when cast to ints
+  comment_positions: Array[Map[String, String]],
   comment_text: Array[String],
   diff_hunks: Array[String],
   comment_commit_ids: Array[String],

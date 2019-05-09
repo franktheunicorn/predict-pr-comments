@@ -98,8 +98,13 @@ class DataFetch(sc: SparkContext) {
       List("pull_request_url"))
       .filter(!($"pull_request_url" === "null"))
 
-    // Strip out the start end "s
-    val processPathsUDF = udf(DataFetch.processPaths _)
+    // Strip out the start end "s because we get nested "s from BQ GH dumps
+    val processBQStringsUDF = udf(DataFetch.processBQString _)
+
+    // Take the either types and convert them to ints
+    // The JSON dumps from BQ have the comment pos as strings even when cast to ints
+    val cleanRawCommentPositionsUDF = udf(DataFetch.cleanRawCommentPositions _)
+
 
     // Strip out the start end "s
     val processUrlUDF = udf(DataFetch.processUrl _)
@@ -115,11 +120,11 @@ class DataFetch(sc: SparkContext) {
         .alias("pull_request_url"),
       processUrlUDF(filteredInput("pull_patch_url"))
         .alias("pull_patch_url"),
-      filteredInput("comment_positions"),
+      cleanRawCommentPositionsUDF(filteredInput("comment_positions")).alias("comment_positions"),
       filteredInput("comment_text"),
       processDiffHunksUDF(filteredInput("diff_hunks")).alias("diff_hunks"),
-      processPathsUDF(filteredInput("comment_file_paths")).alias("comment_file_paths"),
-      processCommitIdsUDF(filteredInput("comment_commit_ids")).alias("comment_commit_ids")
+      processBQStringssUDF(filteredInput("comment_file_paths")).alias("comment_file_paths"),
+      processBQStringsUDF(filteredInput("comment_commit_ids")).alias("comment_commit_ids")
     ).as[ParsedCommentInputData]
     cleanedInputData
   }
@@ -127,13 +132,8 @@ class DataFetch(sc: SparkContext) {
 }
 
 object DataFetch {
-
   def processUrl(input: String): String = {
     input.replaceAll("^\"|\"$", "")
-  }
-
-  def processPaths(input: Seq[String]): Seq[String] = {
-    input.map(_.replaceAll("^\"|\"$", ""))
   }
 
   def processDiffHunks(input: Seq[String]): Seq[String] = {
@@ -145,7 +145,25 @@ object DataFetch {
     )
   }
 
-  def processCommitIds(input: Seq[String]): Seq[String] = {
-    input.map(_.replaceAll("\"", ""))
+  def processBQStrings(input: Seq[String]): Seq[String] = {
+    input.map(_.replaceAll("^\"|\"$", ""))
+  }
+
+  def cleanRawCommentPositions(input: Seq[Map[String, String]]): Seq[CommentPosition] = {
+    def strOptToInt(elem: Option[String]): Option[Int] = {
+      elem.flatMap{concreteElem =>
+        try {
+          Some(concreteElem.toInt)
+        } catch {
+          case e: Exception => None
+        }
+      }
+    }
+    input.map {pos =>
+      CommentPosition(
+        strOptToInt(pos.get("original_position")),
+        strOptToInt(pos.get("new_position")))
+    }
+>>>>>>> Update how we read in the input comment data to use a specified schema, extract the commit ids correctly, and handle the string type returned fropm the BQ json dump. Update the IssueDatafetcher CSV loader to use header as before.
   }
 }
