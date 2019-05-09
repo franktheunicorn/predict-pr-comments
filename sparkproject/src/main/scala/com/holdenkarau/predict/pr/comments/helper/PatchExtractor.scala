@@ -18,13 +18,12 @@ object PatchExtractor {
   // For now we only use lines that change
   val removedLine = """^-(.*)$""".r
   val addedLine = """^\+(.*)$""".r
-  val contextLine = """^\s.*$""".r
+  val contextLine = """^\s(.*)$""".r
 
   /*
    * Process a given patch. You don't want to look inside this.
    */
-  def processPatch(patch: String, diff: Boolean = false): Seq[PatchRecord] = {
-    val contextLines = 4
+  def processPatch(patch: String, diff: Boolean = false, contextLines: Int = 4): Seq[PatchRecord] = {
     val lines = patch.split("\n").toArray
     var commitId: String = null
     var filename: String = null
@@ -46,8 +45,21 @@ object PatchExtractor {
           false
         case blockHeaderRegex(_, _) =>
           false
-        case _ =>
+        case contextLine(_) =>
           true
+        case addedLine(_) =>
+          true
+        case removedLine(_) =>
+          true
+        case _ =>
+          false
+      }
+    }
+    def extractLineText(line: String) = {
+      line match {
+        case addedLine(lineText) => lineText
+        case removedLine(lineText) => lineText
+        case contextLine(lineText) => lineText
       }
     }
     // Loop through the inputs
@@ -87,11 +99,11 @@ object PatchExtractor {
           linesFromHeader = linesFromHeader + 1
           None
         case addedLine(lineText) if seenDiff && newPos != null =>
-          previousQueue.enqueue(line)
+          previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
           }
-          val nextLines = lines.slice(index, index+3).filter(isRegularLine)
+          val nextLines = lines.slice(index, index+3).filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
           newPos = newPos + 1
@@ -111,12 +123,12 @@ object PatchExtractor {
             None
           }
         case removedLine(lineText) if seenDiff && newPos != null  =>
-          previousQueue.enqueue(line)
+          previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
           }
 
-          val nextLines = lines.slice(index, index+3).filter(isRegularLine)
+          val nextLines = lines.slice(index, index+3).filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
           oldPos = oldPos + 1
@@ -135,8 +147,8 @@ object PatchExtractor {
           } else {
             None
           }
-        case _ if seenDiff && newPos != null =>
-          previousQueue.enqueue(line)
+        case contextLine(lineText) if seenDiff && newPos != null =>
+          previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
           }
