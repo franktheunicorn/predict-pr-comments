@@ -7,6 +7,7 @@ import com.holdenkarau.predict.pr.comments.sparkProject.dataprep.PatchRecord
 
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
+import org.scalactic._
 
 class PatchExtractorTest extends FunSuite {
   val simpleInput = """
@@ -57,47 +58,85 @@ index 01aa14b..8aa21e7 100644
  		conn:     conn,
  	}
 """
+  implicit val patchRecordEq =
+    new Equality[PatchRecord] {
+      def areEqual(a: PatchRecord, b: Any): Boolean = {
+        b match {
+          case c: PatchRecord =>
+            if (a.commitId == c.commitId &&
+              a.oldPos == c.oldPos &&
+              a.newPos == c.newPos &&
+              a.linesFromHeader == c.linesFromHeader &&
+              a.text == c.text &&
+              a.filename == c.filename &&
+              a.add == c.add) {
+              // Kind of sketchy but gives us nice UI
+              try {
+                a.previousLines should be (c.previousLines)
+                a.nextLines should be (c.nextLines)
+                true
+              } catch {
+                case e: org.scalatest.exceptions.TestFailedException =>
+                  println("*****")
+                  println(s"While comparing ${a.commitId} at ${a.oldPos} / ${a.newPos}")
+                  println(s"Array elems not equal ${e.toString}")
+                  println("****")
+                  false
+              }
+            } else {
+              false
+            }
+          case _ =>
+            false
+        }
+      }
+    }
 
   test("Simple input") {
     val results = PatchExtractor.processPatch(simpleInput)
     val expected = List(
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         172,173, Some(4),
-        Array(),
+        Array("- DOMAIN,google.com,Proxy","- DOMAIN-SUFFIX,ad.com,REJECT","- IP-CIDR,127.0.0.0/8,DIRECT","- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT"),
         "- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT",
-        Array(),
+        Array("- SOURCE-IP-CIDR,192.168.1.201/32,DIRECT","- GEOIP,CN,DIRECT","# FINAL would remove after prerelease"),
         "README.md",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         34,35, Some(4),
-        Array(),
-	"	metadata := parseHTTPAddr(request)",
-        Array(),
+        Array("", "// NewHTTP is HTTPAdapter generator", "func NewHTTP(request *http.Request, conn net.Conn) *HTTPAdapter {", "	metadata := parseHTTPAddr(request)"),
+        "	metadata := parseHTTPAddr(request)",
+        Array("	metadata := parseHTTPAddr(request)", "	metadata.SourceIP = parseSourceIP(conn)", "	return &HTTPAdapter{"),
         "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         34,36, Some(5),
-        Array(),
+        Array("// NewHTTP is HTTPAdapter generator", "func NewHTTP(request *http.Request, conn net.Conn) *HTTPAdapter {", "	metadata := parseHTTPAddr(request)", "	metadata.SourceIP = parseSourceIP(conn)"),
         "	metadata.SourceIP = parseSourceIP(conn)",
-        Array(),
+        Array("	metadata.SourceIP = parseSourceIP(conn)", "	return &HTTPAdapter{", "		metadata: parseHTTPAddr(request),"),
         "adapters/inbound/http.go",
         true),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         36,37, Some(7),
-        Array(),
+        Array("	metadata := parseHTTPAddr(request)", "	metadata.SourceIP = parseSourceIP(conn)", "	return &HTTPAdapter{", "		metadata: parseHTTPAddr(request),"),
         "		metadata: parseHTTPAddr(request),",
-        Array(),
+        Array("		metadata: parseHTTPAddr(request),", "		metadata: metadata,", "		R:        request,"),
         "adapters/inbound/http.go",
         false),
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         36,38, Some(8),
-        Array(),
+        Array("	metadata.SourceIP = parseSourceIP(conn)", "	return &HTTPAdapter{", "		metadata: parseHTTPAddr(request),", "		metadata: metadata,"),
         "		metadata: metadata,",
-        Array(),
+        Array("		metadata: metadata,", "		R:        request,", "		conn:     conn,"),
         "adapters/inbound/http.go",
         true))
-    results should contain theSameElementsAs expected
+    val resultsExpected = results.zip(expected)
+    resultsExpected.foreach{
+      case (r, e) =>
+        r should equal (e)
+    }
   }
+
   val simpleDiffInput = """
 diff --git a/run_spark_data_process.sh b/run_spark_data_process.sh
 index bd71564..e0d635d 100755
@@ -123,6 +162,9 @@ index d272c48..d408ab2 100755
  export MEMORY_OVERHEAD_FRACTION=0.40
  export SPARK_EXEC_MEMORY=35g
 """
+  def stripContextLines(r: PatchRecord): PatchRecord = {
+    r.copy(previousLines=null, nextLines=null)
+  }
   test("Simple diff input") {
     val results = PatchExtractor.processPatch(simpleDiffInput)
     val expected = List(
@@ -154,7 +196,7 @@ index d272c48..d408ab2 100755
         Array(),
         "rundev.sh",
         true))
-    results should contain theSameElementsAs expected
+    results.map(stripContextLines) should contain theSameElementsAs expected.map(stripContextLines)
   }
 
   val slightlyComplexInput = """
@@ -251,21 +293,20 @@ index 471b9e0a1a877..d9eff9f9b0ac1 100644
     commits should contain theSameElementsAs expectedCommits
     numAdded should be (23)
     numRemoved should be (3)
-    results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
+    results.map(stripContextLines) should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
       399, 398, Some(4),
-      Array(),
+      null,
         "    // If the data is already approriately partioned with a known partioner we can work locally.",
-      Array(),
+      null,
       "core/src/main/scala/org/apache/spark/rdd/RDD.scala",
       false))
-    results should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
+    results.map(stripContextLines) should contain (PatchRecord("5fd36592a26b07fdb58e79e4efbb6b70daea54df",
       399, 399, Some(5),
-      Array(),
+      null,
       "    // If the data is already approriately partitioned with a known partitioner we can work locally.",
-      Array(),
+      null,
       "core/src/main/scala/org/apache/spark/rdd/RDD.scala",
       true))
 
   }
 }
-
