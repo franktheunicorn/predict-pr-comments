@@ -99,7 +99,7 @@ class DataFetch(sc: SparkContext) {
       .filter(!($"pull_request_url" === "null"))
 
     // Strip out the start end "s because we get nested "s from BQ GH dumps
-    val processBQStringsUDF = udf(DataFetch.processBQString _)
+    val processBQStringsUDF = udf(DataFetch.processBQStrings _)
 
     // Take the either types and convert them to ints
     // The JSON dumps from BQ have the comment pos as strings even when cast to ints
@@ -109,10 +109,7 @@ class DataFetch(sc: SparkContext) {
     // Strip out the start end "s
     val processUrlUDF = udf(DataFetch.processUrl _)
 
-    // Strip out all the "s
-    val processCommitIdsUDF = udf(DataFetch.processCommitIds _)
-
-    // Strip out all the "s
+    // Load the nested JSON properly
     val processDiffHunksUDF = udf(DataFetch.processDiffHunks _)
 
     val cleanedInputData = filteredInput.select(
@@ -123,7 +120,7 @@ class DataFetch(sc: SparkContext) {
       cleanRawCommentPositionsUDF(filteredInput("comment_positions")).alias("comment_positions"),
       filteredInput("comment_text"),
       processDiffHunksUDF(filteredInput("diff_hunks")).alias("diff_hunks"),
-      processBQStringssUDF(filteredInput("comment_file_paths")).alias("comment_file_paths"),
+      processBQStringsUDF(filteredInput("comment_file_paths")).alias("comment_file_paths"),
       processBQStringsUDF(filteredInput("comment_commit_ids")).alias("comment_commit_ids")
     ).as[ParsedCommentInputData]
     cleanedInputData
@@ -164,6 +161,5 @@ object DataFetch {
         strOptToInt(pos.get("original_position")),
         strOptToInt(pos.get("new_position")))
     }
->>>>>>> Update how we read in the input comment data to use a specified schema, extract the commit ids correctly, and handle the string type returned fropm the BQ json dump. Update the IssueDatafetcher CSV loader to use header as before.
   }
 }
