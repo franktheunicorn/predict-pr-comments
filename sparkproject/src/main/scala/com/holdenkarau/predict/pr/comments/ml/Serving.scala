@@ -69,7 +69,7 @@ class ModelServingService extends ModelRequestGrpc.ModelRequest {
     ModelServingService.logger.info(s"panda predicting on, $repoName $pullRequestURL $patch")
     val patchRecords = PatchExtractor.processPatch(patch=patch, diff=false)
     val elems = patchRecords.map{record =>
-      val extension = TrainingPipeline.extractExtension(record.filename).getOrElse(null)
+      val extension = Featurizer.extractExtension(record.filename).getOrElse(null)
       val oldPos = record.oldPos
       val newPos = record.newPos
 

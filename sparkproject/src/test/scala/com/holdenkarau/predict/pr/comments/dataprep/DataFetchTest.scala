@@ -93,6 +93,8 @@ Exception in thread "main" java.lang.NullPointerException
       "d2b11db69b1abb5cbe0b41c4c17352504d77c25a",
       "d2b11db69b1abb5cbe0b41c4c17352504d77c25a",
       "d2b11db69b1abb5cbe0b41c4c17352504d77c25a")
+
+    // TODO: Add something about the diff hunks in here
   }
 
   test("calling with a local file fetches a result") {
