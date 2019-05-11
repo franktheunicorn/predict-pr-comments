@@ -23,6 +23,7 @@ case class CommentInputData(
   diff_hunks: Array[String],
   comment_commit_ids: Array[String],
   comment_file_paths: Array[String])
+
 case class ParsedCommentInputData(
   pull_request_url: String,
   pull_patch_url: String,

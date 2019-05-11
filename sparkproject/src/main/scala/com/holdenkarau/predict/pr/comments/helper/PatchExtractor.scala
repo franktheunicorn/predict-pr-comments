@@ -29,7 +29,11 @@ object PatchExtractor {
     var filename: String = null
     var oldPos: Integer = null
     var newPos: Integer = null
-    var linesFromHeader: Integer = null
+    // lines from header starts at 0 for diff view
+    var linesFromHeader: Integer = diff match {
+      case true => 0
+      case false => null
+    }
     var seenDiff: Boolean = false
     var previousQueue: Queue[String] = new Queue[String]()
     // Return if this is not a diff command specific line
@@ -91,14 +95,14 @@ object PatchExtractor {
         case newFilenameRegex(f) if seenDiff && newPos == null =>
           filename = f
           None
-        case blockHeaderRegex(op, np) if seenDiff =>
+        case blockHeaderRegex(op, np) if seenDiff || diff =>
           previousQueue.dequeueAll(_ => true)
           oldPos = op.toInt - 1
           newPos = np.toInt - 1
           // Complicated
           linesFromHeader = linesFromHeader + 1
           None
-        case addedLine(lineText) if seenDiff && newPos != null =>
+        case addedLine(lineText) if (seenDiff || diff) && newPos != null =>
           previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
@@ -122,7 +126,7 @@ object PatchExtractor {
           } else {
             None
           }
-        case removedLine(lineText) if seenDiff && newPos != null  =>
+        case removedLine(lineText) if (seenDiff || diff) && newPos != null  =>
           previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
@@ -147,7 +151,7 @@ object PatchExtractor {
           } else {
             None
           }
-        case contextLine(lineText) if seenDiff && newPos != null =>
+        case contextLine(lineText) if (seenDiff || diff) && newPos != null =>
           previousQueue.enqueue(lineText)
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
@@ -159,6 +163,7 @@ object PatchExtractor {
           linesFromHeader = linesFromHeader + 1
           None
         case _ =>
+          println(s"idk what ${line} was")
           // Not in diff/patch view
           None
       }
