@@ -9,6 +9,7 @@ import com.holdenkarau.spark.testing.{SharedSparkContext, Utils}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.ScalaReflection
+import org.scalactic._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -29,11 +30,11 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
     "",
     "")
 
-  implicit val labeledFeatureEq =
-    new Equality[LabeledFeature] {
-      def areEqual(a: LabeledFeature, b: Any): Boolean = {
+  implicit val labeledRecordEq =
+    new Equality[LabeledRecord] {
+      def areEqual(a: LabeledRecord, b: Any): Boolean = {
         b match {
-          case c: LabeledFeature =>
+          case c: LabeledRecord =>
             if (a.lineText == c.lineText &&
               a.filename == c.filename &&
               a.add == c.add &&
