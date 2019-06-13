@@ -33,6 +33,8 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
   implicit val labeledRecordEq =
     new Equality[LabeledRecord] {
       def areEqual(a: LabeledRecord, b: Any): Boolean = {
+        println("Comparing equality")
+        println("Hi!")
         b match {
           case c: LabeledRecord =>
             if (a.lineText == c.lineText &&
@@ -57,6 +59,9 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
                   false
               }
             } else {
+              println("*****")
+              println("Precondition failed")
+              println("*****")
               false
             }
           case _ =>
@@ -69,21 +74,24 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
   test("test extracting from diff hunks") {
     val results = Featurizer.produceRecordsFromDiffHunks(inputRecord.parsed_input)
     val expected = LabeledRecord(
-      previousLines=Seq("type SourceType int",
+      previousLines=Seq(
         "type Metadata struct {",
  	"	NetWork  NetWork",
- 	"	Source   SourceType"),
+ 	"	Source   SourceType",
+        "	SourceIP *net.IP"),
       lineText="	SourceIP *net.IP",
-      nextLines=Seq("	SourceIP *net.IP",
-        " 	AddrType int",
-        " 	Host     string",
-        " 	IP       *net.IP",
-        "	Port     string"),
+      nextLines=Seq(
+        "	SourceIP *net.IP",
+        "	AddrType int",
+        "	Host     string",
+        "	IP       *net.IP"),
       filename="constant/metadata.go",
       add=true,
       commented=true,
+      comment_text="text",
       line=35)
-    results.toArray should be (Array(expected))
+    results.size should be (1)
+    results should contain (expected)
   }
 
 

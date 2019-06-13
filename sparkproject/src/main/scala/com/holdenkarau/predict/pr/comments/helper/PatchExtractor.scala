@@ -107,7 +107,8 @@ object PatchExtractor {
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
           }
-          val nextLines = lines.slice(index, index+3).filter(isRegularLine).map(extractLineText)
+          val nextLines = lines.slice(index, index + contextLines)
+            .filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
           newPos = newPos + 1
@@ -132,7 +133,8 @@ object PatchExtractor {
             previousQueue.dequeue()
           }
 
-          val nextLines = lines.slice(index, index+3).filter(isRegularLine).map(extractLineText)
+          val nextLines = lines.slice(index, index + contextLines)
+            .filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
           oldPos = oldPos + 1
