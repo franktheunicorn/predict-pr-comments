@@ -119,8 +119,8 @@ object IssueDataFetch {
     // TODO: better regex
     // Scala regex is jank with handling escaped () so just strip them as " "s
     val cleanedStr = inputStr.replaceAll(raw"\)", " ").replaceAll(raw"\(", " ")
-    val stackTraceRegex = raw"[\s\\/]+([^ /]*?\.[^ /]*?):(\d+)\s*".r
-    val stackTraces = for (m <- stackTraceRegex.findAllMatchIn(cleanedStr)) yield IssueStackTrace(repo, m.group(1), m.group(2).toInt)
+    val stackTraceRegex = raw"[\s\\/]+([^ /]*?\.(scala|java|go|cpp|py|pyc)):(\d+)\s*".r
+    val stackTraces = for (m <- stackTraceRegex.findAllMatchIn(cleanedStr)) yield IssueStackTrace(repo, m.group(1), m.group(3).toInt)
     stackTraces
   }
 }

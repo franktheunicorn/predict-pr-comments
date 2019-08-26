@@ -23,7 +23,7 @@ object PatchExtractor {
   /*
    * Process a given patch. You don't want to look inside this.
    */
-  def processPatch(patch: String, diff: Boolean = false, contextLines: Int = 4): Seq[PatchRecord] = {
+  def processPatch(patch: String, diff: Boolean = false, contextLines: Int = 4, nextContextLines: Int =4): Seq[PatchRecord] = {
     val lines = patch.split("\n").toArray
     var commitId: String = null
     var filename: String = null
@@ -107,7 +107,7 @@ object PatchExtractor {
           if (previousQueue.length > contextLines) {
             previousQueue.dequeue()
           }
-          val nextLines = lines.slice(index, index + contextLines)
+          val nextLines = lines.slice(index, index + nextContextLines)
             .filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
@@ -133,7 +133,7 @@ object PatchExtractor {
             previousQueue.dequeue()
           }
 
-          val nextLines = lines.slice(index, index + contextLines)
+          val nextLines = lines.slice(index, index + nextContextLines)
             .filter(isRegularLine).map(extractLineText)
 
           linesFromHeader = linesFromHeader + 1
