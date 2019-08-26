@@ -77,10 +77,6 @@ index 01aa14b..8aa21e7 100644
                 true
               } catch {
                 case e: org.scalatest.exceptions.TestFailedException =>
-                  println("*****")
-                  println(s"While comparing ${a.commitId} at ${a.oldPos} / ${a.newPos}")
-                  println(s"Array elems not equal ${e.toString}")
-                  println("****")
                   false
               }
             } else {
@@ -93,7 +89,7 @@ index 01aa14b..8aa21e7 100644
     }
 
   test("Simple input") {
-    val results = PatchExtractor.processPatch(simpleInput)
+    val results = PatchExtractor.processPatch(simpleInput, nextContextLines=3)
     val expected = List(
       PatchRecord("97d57259eaf8ca29ce56a194de110d526c2d1629",
         172,173, Some(4),
