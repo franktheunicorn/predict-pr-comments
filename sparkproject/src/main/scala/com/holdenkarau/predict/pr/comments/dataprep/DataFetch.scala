@@ -41,6 +41,13 @@ class DataFetch(sc: SparkContext) {
       case _ => session.emptyDataset[StoredPatch]
     }
     val cleanedInputData = cleanInputs(inputData)
+    val resultData = innerFetch(cleanedInputData, cachedData, cache)
+    resultData.write.format("parquet").mode(SaveMode.Append).save(output)
+  }
+
+  def innerFetch(cleanedInputData: Dataset[ParsedCommentInputData],
+    cachedData: Dataset[StoredPatch],
+    cache: Option[String]): Dataset[ResultCommentData] = {
 
     val patchFetcher = new PatchFetcher(sc)
 
@@ -64,7 +71,7 @@ class DataFetch(sc: SparkContext) {
       }
       partition.map(processPatch)
     }
-    resultData.write.format("parquet").mode(SaveMode.Append).save(output)
+    resultData
   }
 
   val inputSchema = ScalaReflection.schemaFor[CommentInputData]

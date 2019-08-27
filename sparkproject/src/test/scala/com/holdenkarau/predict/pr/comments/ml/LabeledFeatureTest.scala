@@ -33,8 +33,6 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
   implicit val labeledRecordEq =
     new Equality[LabeledRecord] {
       def areEqual(a: LabeledRecord, b: Any): Boolean = {
-        println("Comparing equality")
-        println("Hi!")
         b match {
           case c: LabeledRecord =>
             if (a.lineText == c.lineText &&
@@ -52,16 +50,9 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
                 true
               } catch {
                 case e: org.scalatest.exceptions.TestFailedException =>
-                  println("*****")
-                  println(s"While comparing ${a.filename}")
-                  println(s"Array elems not equal ${e.toString}")
-                  println("****")
                   false
               }
             } else {
-              println("*****")
-              println("Precondition failed")
-              println("*****")
               false
             }
           case _ =>
@@ -95,8 +86,7 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
   }
 
 
-  //  test("test we extract the correct labeled features") {
-  def a() {
+  test("test we extract the correct labeled features") {
     val session = SparkSession.builder().getOrCreate()
     import session.implicits._
 
@@ -107,13 +97,23 @@ class LabeledFeatureTest extends FunSuite with SharedSparkContext {
     val localRecords = labeledRecords.collect()
     labeledRecords.filter($"commented" === true).collect() should contain (
       LabeledRecord(
-        Seq.empty[String],
-        "	metadata.SourceIP = parseSourceIP(conn)",
-        Seq.empty[String],
-        "adapters/inbound/http.go",
+        previousLines=Seq(
+          "type Metadata struct {",
+ 	  "	NetWork  NetWork",
+ 	  "	Source   SourceType",
+          "	SourceIP *net.IP"),
+        lineText="	SourceIP *net.IP",
+        nextLines=Seq(
+          "	SourceIP *net.IP",
+          "	AddrType int",
+          "	Host     string",
+          "	IP       *net.IP"),
+        filename="constant/metadata.go",
         true,
         true,
-        34))
+        35,
+        comment_text="text"
+      ))
   }
 }
 

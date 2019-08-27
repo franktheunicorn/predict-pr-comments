@@ -47,7 +47,7 @@ class Featurizer(sc: SparkContext) {
 
   // Produce data for training
   def prepareTrainingData(input: Dataset[ResultCommentData],
-    issues: Dataset[IssueStackTrace]): Dataset[PreparedData] = {
+    issues: Dataset[IssueStackTrace], pyOnly: Boolean = true): Dataset[PreparedData] = {
 
     val labeledRecords: Dataset[LabeledRecord] = input.flatMap(Featurizer.produceRecord)
     val labeledWithEnd = labeledRecords.withColumn(
@@ -63,14 +63,14 @@ class Featurizer(sc: SparkContext) {
       usingColumns=List("endFileName", "line"), joinType="left_outer")
     // Extract the extension and cast the label
     val extractExtensionUDF = udf(Featurizer.extractExtension _)
-    recordsWithIssues.withColumn(
+    val annotated = recordsWithIssues.withColumn(
       "extension", extractExtensionUDF($"labaeledRecords.filename"))
       .withColumn(
         "label", $"commented".cast("double"))
       .withColumn(
-        "line_length", length($"text").cast("double"))
+        "line_length", length($"lineText").cast("double"))
       .withColumn(
-        "only_spaces", expr("""text rlike "^\s+$" """).cast("double"))
+        "only_spaces", expr("""lineText rlike "^\s+$" """).cast("double"))
       .withColumn(
         "not_in_issues", isnull($"pandas").cast("double"))
       .select(
@@ -88,6 +88,10 @@ class Featurizer(sc: SparkContext) {
         $"commit_id",
         $"offset")
       .as[PreparedData]
+    pyOnly match {
+      case true => annotated.filter($"extension" === "py")
+      case false => annotated
+    }
   }
 }
 
