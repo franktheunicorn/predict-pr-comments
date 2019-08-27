@@ -131,12 +131,12 @@ class TrainingPipeline(sc: SparkContext) {
       val prepPipeline = new Pipeline()
       // Turn our different file names into string indexes
       val extensionIndexer = new StringIndexer()
-        .setHandleInvalid("keep") // Some files no extensions
+        .setHandleInvalid("skip")
         .setInputCol("extension")
         .setOutputCol("extension_index")
       // For now we use the default tokenizer
       // In the future we could be smart based on programming language
-      val tokenizer = new RegexTokenizer().setInputCol("text").setOutputCol("tokens")
+      val tokenizer = new RegexTokenizer().setInputCol("lineText").setOutputCol("tokens")
       // See the sorced tech post about id2vech - https://blog.sourced.tech/post/id2vec/
       val word2vec = new Word2Vec().setInputCol("tokens").setOutputCol("wordvecs")
       //val hashingTf = new HashingTF().setInputCol("tokens").setOutputCol("rawTf")

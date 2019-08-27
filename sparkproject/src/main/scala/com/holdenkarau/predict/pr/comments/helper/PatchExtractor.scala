@@ -165,7 +165,7 @@ object PatchExtractor {
           linesFromHeader = linesFromHeader + 1
           None
         case _ =>
-          println(s"idk what ${line} was")
+          // println(s"idk what ${line} was")
           // Not in diff/patch view
           None
       }
